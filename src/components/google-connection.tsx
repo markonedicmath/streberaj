@@ -3,47 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { GoogleConnectionStatus } from "@/lib/google-oauth";
 import { ErrorMessage } from "./forms";
 
-export function GoogleAutoSync({
-  enabled,
-  spreadsheetId,
-  refresh,
-}: {
-  enabled: boolean;
-  spreadsheetId: string;
-  refresh: () => Promise<void>;
+export function GoogleAutoSync(_props: {
+  enabled?: boolean;
+  spreadsheetId?: string;
+  refresh?: () => Promise<void>;
 }) {
-  useEffect(() => {
-    if (!enabled || !spreadsheetId) return;
-    let stopped = false,
-      busy = false;
-    async function update() {
-      if (busy || stopped) return;
-      busy = true;
-      try {
-        const response = await fetch("/api/google/connection", {
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-        const status = (await response.json()) as GoogleConnectionStatus;
-        if (!status.connected || stopped) return;
-        await fetch("/api/sync?automatic=1", { method: "POST" });
-        if (!stopped) await refresh();
-      } catch {
-        /* Sinhronizacija čuva poruku greške na serveru. */
-      } finally {
-        busy = false;
-      }
-    }
-    void update();
-    // Provera na svakih 15 minuta ako je prozor aktivan
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void update();
-    }, 900000);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [enabled, spreadsheetId, refresh]);
   return null;
 }
 export default function GoogleConnection({

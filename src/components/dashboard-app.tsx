@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Calendar from "./calendar";
 import StaffNotes from "./staff-notes";
-import ActivityNotifications, { type Activity } from "./activity-notifications";
+import ActivityNotifications from "./activity-notifications";
 import ResetBoard from "./reset-board";
 import AccountSelect from "./account-select";
 import SettingsPanel from "./settings-panel";
@@ -68,6 +68,18 @@ function isBojanMatch(str: string): boolean {
   return cleanCode(str).includes("bojanbasic");
 }
 
+async function parseResponse<T = any>(
+  res: Response,
+): Promise<{ ok: boolean; status: number; data: T | null }> {
+  try {
+    const text = await res.text();
+    const data = JSON.parse(text);
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: res.status, data: null };
+  }
+}
+
 export default function Dashboard() {
   const [view, setView] = useState<SchoolView | null>(null),
     [loading, setLoading] = useState(true),
@@ -114,9 +126,11 @@ export default function Dashboard() {
     setTroubleshootError("");
     try {
       const res = await fetch(`/api/troubleshoot?code=${encodeURIComponent(code)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Neispravna lozinka.");
-      setTroubleshootWorkers(data.workers || []);
+      const parsed = await parseResponse<{ ok?: boolean; error?: string; workers?: any[] }>(res);
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.data?.error || "Veza sa serverom je privremeno prekinuta.");
+      }
+      setTroubleshootWorkers(parsed.data.workers || []);
       setTroubleshootOpen(true);
     } catch (err) {
       setTroubleshootError((err as Error).message);
@@ -155,23 +169,31 @@ export default function Dashboard() {
     } catch {}
   }, [hourGuides]);
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/state", { cache: "no-store" }),
-      data = await res.json();
-    if (!res.ok) {
-      setView(null);
-      setLoginError(data.error);
+    try {
+      const res = await fetch("/api/state", { cache: "no-store" });
+      const parsed = await parseResponse<SchoolView & { error?: string }>(res);
+      if (!parsed.ok || !parsed.data) {
+        if (parsed.status === 401) {
+          setView(null);
+          setLoginError(parsed.data?.error || "Prijavite se.");
+          setLoading(false);
+        }
+        return;
+      }
+      const data = parsed.data;
+      setView((current) =>
+        !current ||
+        !Number.isFinite(current.revision) ||
+        data.revision >= current.revision
+          ? data
+          : current,
+      );
+      setLoginError("");
+    } catch {
+      // network glitch
+    } finally {
       setLoading(false);
-      return;
     }
-    setView((current) =>
-      !current ||
-      !Number.isFinite(current.revision) ||
-      data.revision >= current.revision
-        ? data
-        : current,
-    );
-    setLoginError("");
-    setLoading(false);
   }, []);
 
   const selectWorker = useCallback(
@@ -184,8 +206,10 @@ export default function Dashboard() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: "bojanbasic", actorId }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Prijava nije uspela.");
+        const parsed = await parseResponse<{ ok?: boolean; error?: string }>(res);
+        if (!parsed.ok || !parsed.data) {
+          throw new Error(parsed.data?.error || "Prijava nije uspela.");
+        }
         setTroubleshootOpen(false);
         setLoading(true);
         await refresh();
@@ -249,78 +273,26 @@ export default function Dashboard() {
       ),
     );
 
-  const onNewActivity = useCallback((events: Activity[]) => {
-    const isUnfocused =
-      typeof document !== "undefined" &&
-      (document.hidden || !document.hasFocus());
-    if (isUnfocused && events.length > 0) {
-      document.title = "Novo obaveštenje";
-    }
-  }, []);
-
-  useEffect(() => {
-    const isUnfocused =
-      typeof document !== "undefined" &&
-      (document.hidden || !document.hasFocus());
-    if (isUnfocused && hasUnreadMessages) {
-      document.title = "Novo obaveštenje";
-    }
-  }, [hasUnreadMessages]);
-
-  useEffect(() => {
-    const restoreTitle = () => {
-      document.title = "Štreberaj";
-    };
-    window.addEventListener("focus", restoreTitle);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        restoreTitle();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", restoreTitle);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
-
   useEffect(() => {
     void refresh().catch(() => {
       setLoginError("Veza sa aplikacijom nije dostupna.");
       setLoading(false);
     });
 
-    let lastPoll = Date.now();
-    let timer: ReturnType<typeof setTimeout>;
-
-    const scheduleNext = () => {
-      const delay =
-        typeof document !== "undefined" &&
-        document.visibilityState === "visible"
-          ? 7000
-          : 12000;
-      timer = setTimeout(() => {
-        void refresh()
-          .catch(() => {})
-          .finally(() => {
-            lastPoll = Date.now();
-            scheduleNext();
-          });
-      }, delay);
-    };
-    scheduleNext();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refresh().catch(() => {});
+      }
+    }, 30000);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        if (Date.now() - lastPoll > 3000) {
-          void refresh().catch(() => {});
-          lastPoll = Date.now();
-        }
+        void refresh().catch(() => {});
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      clearTimeout(timer);
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [refresh]);
@@ -345,9 +317,10 @@ export default function Dashboard() {
   }, []);
   const command: Command = async (type, payload) => {
     if (type === "refresh") {
-      const res = await fetch("/api/state", { cache: "no-store" }),
-        data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const res = await fetch("/api/state", { cache: "no-store" });
+      const parsed = await parseResponse<SchoolView & { error?: string }>(res);
+      if (!parsed.ok || !parsed.data) throw new Error(parsed.data?.error || "Veza sa serverom nije dostupna.");
+      const data = parsed.data;
       setView((current) =>
         !current ||
         !Number.isFinite(current.revision) ||
@@ -358,15 +331,18 @@ export default function Dashboard() {
       return { view: data };
     }
     const response = await fetch("/api/command", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({ type, payload }),
-      }),
-      data = await response.json();
-    if (!response.ok) throw new Error(data.error);
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({ type, payload }),
+    });
+    const parsed = await parseResponse<{ view: SchoolView; error?: string; warning?: string; entityId?: string }>(response);
+    if (!parsed.ok || !parsed.data) {
+      throw new Error(parsed.data?.error || "Izmena nije sačuvana.");
+    }
+    const data = parsed.data;
     setView((current) =>
       !current ||
       !Number.isFinite(current.revision) ||
@@ -745,7 +721,6 @@ export default function Dashboard() {
           view={view}
           notice={notice}
           onConsume={() => setNotice("")}
-          onActivity={onNewActivity}
           enabled={view.actor.preferences?.notifications ?? true}
           soundEnabled={view.actor.preferences?.sound ?? false}
         />
@@ -766,21 +741,26 @@ export default function Dashboard() {
                 value={view.actor.id}
                 onError={setNotice}
                 onChange={async (actorId) => {
-                  const response = await fetch("/api/troubleshoot", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: "bojanbasic", actorId }),
-                  });
-                  if (!response.ok) {
-                    await fetch("/api/demo", {
+                  try {
+                    const response = await fetch("/api/troubleshoot", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ actorId }),
+                      body: JSON.stringify({ code: "bojanbasic", actorId }),
                     });
+                    const parsed = await parseResponse(response);
+                    if (!parsed.ok) {
+                      await fetch("/api/demo", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ actorId }),
+                      }).catch(() => {});
+                    }
+                    closeLesson();
+                    setTab("Raspored");
+                    await refresh();
+                  } catch (e) {
+                    setNotice((e as Error).message);
                   }
-                  closeLesson();
-                  setTab("Raspored");
-                  await refresh();
                 }}
               />
             ) : (
