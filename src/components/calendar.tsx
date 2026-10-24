@@ -8,7 +8,7 @@ import PackageCounter from "./package-counter";
 import LessonTime from "./lesson-time";
 import { snapDuration, stepDuration } from "@/lib/pricing";
 import StudentAutocomplete from "./student-autocomplete";
-import { addDays, belgradeToday, clock } from "@/lib/time";
+import { addDays, belgradeToday, clock, weekStart } from "@/lib/time";
 import {
   START,
   END,
@@ -51,6 +51,7 @@ interface Props {
   online: boolean;
   hourGuides: boolean;
   teacher: string;
+  focusDate?: string;
   editorDraft?: LessonPreview | null;
   onEditorMove?: (patch: DraftMove) => void;
   onOpen: (l: Lesson) => void;
@@ -82,6 +83,7 @@ export default function Calendar({
   online,
   hourGuides,
   teacher,
+  focusDate,
   editorDraft,
   onEditorMove,
   onOpen,
@@ -210,9 +212,12 @@ export default function Calendar({
       requestAnimationFrame(() => {
         const container = scroll.current;
         if (!container) return;
-        const lane = container.querySelector<HTMLElement>(
-          `[data-lane-date="${belgradeToday()}"]`,
-        );
+        const target =
+          focusDate ||
+          (week === weekStart() ? belgradeToday() : week);
+        const lane =
+          container.querySelector<HTMLElement>(`[data-lane-date="${target}"]`) ||
+          container.querySelector<HTMLElement>(`[data-lane-date="${belgradeToday()}"]`);
         if (lane)
           container.scrollLeft +=
             lane.getBoundingClientRect().left -
@@ -226,7 +231,7 @@ export default function Calendar({
     locate();
     media.addEventListener("change", locate);
     return () => media.removeEventListener("change", locate);
-  }, [week, day, online]);
+  }, [week, day, online, focusDate]);
   useEffect(() => {
     try {
       localStorage.setItem("streberaj-row-heights", JSON.stringify(rows));
