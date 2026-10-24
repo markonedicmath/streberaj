@@ -16,7 +16,7 @@ type Notification = {
   dismiss?: boolean;
   kind?: "lesson-saved";
 };
-type Activity = Omit<Notification, "id">;
+export type Activity = Omit<Notification, "id">;
 
 function changes(previous: SchoolView, current: SchoolView): Activity[] {
   const events: Activity[] = [];
@@ -210,12 +210,14 @@ export default function ActivityNotifications({
   view,
   notice,
   onConsume,
+  onActivity,
   enabled = true,
   soundEnabled = false,
 }: {
   view: SchoolView;
   notice: string;
   onConsume: () => void;
+  onActivity?: (events: Activity[]) => void;
   enabled?: boolean;
   soundEnabled?: boolean;
 }) {
@@ -229,9 +231,11 @@ export default function ActivityNotifications({
       setItems((current) => current.filter((item) => item.id !== id)),
     [],
   );
-  const add = useCallback((events: Activity[]) => {
-    if (!events.length) return;
-    const compact: Activity[] =
+  const add = useCallback(
+    (events: Activity[]) => {
+      if (!events.length) return;
+      onActivity?.(events);
+      const compact: Activity[] =
       events.length > 3
         ? [
             ...events.slice(-2),

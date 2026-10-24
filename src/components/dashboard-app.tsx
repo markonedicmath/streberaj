@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Calendar from "./calendar";
 import StaffNotes from "./staff-notes";
-import ActivityNotifications from "./activity-notifications";
+import ActivityNotifications, { type Activity } from "./activity-notifications";
 import ResetBoard from "./reset-board";
 import AccountSelect from "./account-select";
 import SettingsPanel from "./settings-panel";
@@ -195,24 +195,130 @@ export default function Dashboard() {
     },
     [refresh],
   );
+
+  const [lastReadTime, setLastReadTime] = useState<string>("");
+
+  const actorId = view?.actor.id;
+  useEffect(() => {
+    if (!view || !actorId) return;
+    const storageKey = `streberaj-last-read-msg-${actorId}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) {
+        const latestTime = view.messages.reduce(
+          (max, m) => (m.createdAt > max ? m.createdAt : max),
+          "",
+        );
+        const initTime = latestTime || new Date().toISOString();
+        localStorage.setItem(storageKey, initTime);
+        setLastReadTime(initTime);
+      } else {
+        setLastReadTime(stored);
+      }
+    } catch {}
+  }, [actorId, view]);
+
+  useEffect(() => {
+    if (tab === "Poruke" && view?.actor.id) {
+      const latestTime = view.messages.reduce(
+        (max, m) => (m.createdAt > max ? m.createdAt : max),
+        "",
+      );
+      const nowTime = latestTime || new Date().toISOString();
+      setLastReadTime(nowTime);
+      try {
+        localStorage.setItem(
+          `streberaj-last-read-msg-${view.actor.id}`,
+          nowTime,
+        );
+      } catch {}
+    }
+  }, [tab, view?.messages, view?.actor.id]);
+
+  const hasUnreadMessages =
+    tab !== "Poruke" &&
+    Boolean(
+      view?.messages.some(
+        (m) =>
+          !m.deletedAt &&
+          m.authorId !== view.actor.id &&
+          lastReadTime &&
+          m.createdAt > lastReadTime,
+      ),
+    );
+
+  const onNewActivity = useCallback((events: Activity[]) => {
+    const isUnfocused =
+      typeof document !== "undefined" &&
+      (document.hidden || !document.hasFocus());
+    if (isUnfocused && events.length > 0) {
+      document.title = "Novo obaveštenje";
+    }
+  }, []);
+
+  useEffect(() => {
+    const isUnfocused =
+      typeof document !== "undefined" &&
+      (document.hidden || !document.hasFocus());
+    if (isUnfocused && hasUnreadMessages) {
+      document.title = "Novo obaveštenje";
+    }
+  }, [hasUnreadMessages]);
+
+  useEffect(() => {
+    const restoreTitle = () => {
+      document.title = "Štreberaj";
+    };
+    window.addEventListener("focus", restoreTitle);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        restoreTitle();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", restoreTitle);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     void refresh().catch(() => {
       setLoginError("Veza sa aplikacijom nije dostupna.");
       setLoading(false);
     });
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refresh().catch(() => {});
-      }
-    }, 20000);
+
+    let lastPoll = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      const delay =
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible"
+          ? 7000
+          : 12000;
+      timer = setTimeout(() => {
+        void refresh()
+          .catch(() => {})
+          .finally(() => {
+            lastPoll = Date.now();
+            scheduleNext();
+          });
+      }, delay);
+    };
+    scheduleNext();
+
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        void refresh().catch(() => {});
+        if (Date.now() - lastPoll > 3000) {
+          void refresh().catch(() => {});
+          lastPoll = Date.now();
+        }
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      clearInterval(timer);
+      clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [refresh]);
@@ -578,7 +684,12 @@ export default function Dashboard() {
               }}
             >
               <Icon size={18} />
-              {label}
+              <span className="nav-btn-label">
+                {label}
+                {label === "Poruke" && hasUnreadMessages && (
+                  <span className="nav-blip" aria-label="Nova poruka" />
+                )}
+              </span>
             </button>
           ))}
         </nav>
@@ -586,6 +697,7 @@ export default function Dashboard() {
           view={view}
           notice={notice}
           onConsume={() => setNotice("")}
+          onActivity={onNewActivity}
           enabled={view.actor.preferences?.notifications ?? true}
           soundEnabled={view.actor.preferences?.sound ?? false}
         />
