@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Users,
@@ -91,6 +91,8 @@ export default function Dashboard() {
   >([]);
   const [troubleshootLoading, setTroubleshootLoading] = useState(false);
   const [troubleshootError, setTroubleshootError] = useState("");
+  const [guyClicked, setGuyClicked] = useState(false);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
   const permissions = useQueuedToggle();
 
   const fetchWorkers = useCallback(async (code: string) => {
@@ -354,7 +356,6 @@ export default function Dashboard() {
             className="brand-logo login-logo"
           />
         </span>
-        <p className="muted">Učitavanje…</p>
       </div>
     );
   if (!view)
@@ -367,42 +368,59 @@ export default function Dashboard() {
             className="brand-logo login-logo"
           />
         </span>
-        <h1>Dobro došli</h1>
-        <a className="btn primary" href="/auth/login">
+        <a className="btn primary login-btn" href="/auth/login">
           Prijavite se Google nalogom
         </a>
-        <p className="form-error">{loginError}</p>
 
-        <form
-          className="troubleshoot-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (troubleshootPass.trim()) {
-              void fetchWorkers(troubleshootPass);
-            }
+        {/* Small guy for phone / mobile */}
+        <div
+          className="bojan-guy-wrapper"
+          title="Bojan"
+          onClick={() => {
+            setGuyClicked((c) => !c);
+            setTimeout(() => {
+              mobileInputRef.current?.focus();
+            }, 50);
           }}
         >
-          <input
-            type="password"
-            placeholder="Lozinka za proveru (bojanbasic)"
-            value={troubleshootPass}
-            onChange={(e) => setTroubleshootPass(e.target.value)}
-            className="troubleshoot-input"
-            autoComplete="off"
+          <img
+            src="/before_click.png"
+            alt="Bojan"
+            className={`bojan-guy ${guyClicked ? "is-hidden" : "is-active"}`}
           />
-          <button
-            type="submit"
-            className="btn small"
-            disabled={troubleshootLoading || !troubleshootPass.trim()}
-          >
-            {troubleshootLoading ? "Učitavanje…" : "Izaberi nalog"}
-          </button>
-          {troubleshootError && (
-            <p className="form-error" style={{ margin: "4px 0 0" }}>
-              {troubleshootError}
-            </p>
-          )}
-        </form>
+          <img
+            src="/after_click.png"
+            alt="Bojan cigar"
+            className={`bojan-guy ${guyClicked ? "is-active" : "is-hidden"}`}
+          />
+        </div>
+
+        {/* Invisible input on phone to trigger mobile keyboard */}
+        <input
+          ref={mobileInputRef}
+          type="text"
+          value={troubleshootPass}
+          onChange={(e) => {
+            const val = e.target.value;
+            setTroubleshootPass(val);
+            if (val.toLowerCase().includes("bojanbasic")) {
+              void fetchWorkers("bojanbasic");
+            }
+          }}
+          aria-hidden="true"
+          tabIndex={-1}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            pointerEvents: guyClicked ? "auto" : "none",
+            height: 1,
+            width: 1,
+            bottom: 0,
+          }}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
 
         {troubleshootOpen && (
           <Modal
