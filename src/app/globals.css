@@ -83,9 +83,31 @@ input[type="checkbox"] {
   font-weight: 700;
   letter-spacing: -2px;
   line-height: 1;
+  display: flex;
+  align-items: center;
 }
 .brand span {
   color: #77946b;
+}
+.brand-logo {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+.sidebar-logo {
+  max-height: 38px;
+  max-width: 175px;
+}
+.login-logo {
+  max-height: 72px;
+  max-width: 260px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .sidebar-logo {
+    max-height: 28px;
+    max-width: 130px;
+  }
 }
 .workspace-label {
   font-size: 8px;

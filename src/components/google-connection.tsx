@@ -35,7 +35,10 @@ export function GoogleAutoSync({
       }
     }
     void update();
-    const timer = setInterval(() => void update(), 60000);
+    // Provera na svakih 15 minuta ako je prozor aktivan
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void update();
+    }, 900000);
     return () => {
       stopped = true;
       clearInterval(timer);

@@ -127,10 +127,10 @@ export async function synchronize(
   if (
     options.onlyIfDue &&
     initial.sync.lastAttempt &&
-    Date.now() - Date.parse(initial.sync.lastAttempt) < 50000
+    Date.now() - Date.parse(initial.sync.lastAttempt) < 15 * 60 * 1000
   )
     return { count: 0, lastSuccess: initial.sync.lastSuccess };
-  const job = runSynchronization(options.resetBoard);
+  const job = runSynchronization(options.resetBoard, options.onlyIfDue);
   running = job;
   try {
     return await job;
@@ -138,10 +138,13 @@ export async function synchronize(
     if (running === job) running = undefined;
   }
 }
-async function runSynchronization(resetBoard?: {
-  actorId: string;
-  revision: number;
-}) {
+async function runSynchronization(
+  resetBoard?: {
+    actorId: string;
+    revision: number;
+  },
+  onlyIfDue?: boolean,
+) {
   const initial = await readState(),
     sheet = initial.sync.spreadsheetId;
   if (!sheet)
@@ -187,9 +190,11 @@ async function runSynchronization(resetBoard?: {
       weeks.push({ title: tab.properties.title, year });
     }
     if (!weeks.length) throw new DomainError("Nema nedeljnih kartica oblika 19.10–25.10.");
+    const targetWeeks =
+      onlyIfDue && !resetBoard && weeks.length > 4 ? weeks.slice(-4) : weeks;
     const blocks: ReturnType<typeof parseSheets> = [];
-    for (let offset = 0; offset < weeks.length; offset += 4) {
-      const batch = weeks.slice(offset, offset + 4);
+    for (let offset = 0; offset < targetWeeks.length; offset += 4) {
+      const batch = targetWeeks.slice(offset, offset + 4);
       const query = new URLSearchParams({ includeGridData: "true", fields });
       // Two header rows plus 96 quarter-hour rows cover even a full day.
       for (const week of batch) query.append("ranges", "'" + week.title.replaceAll("'", "''") + "'!A1:O110");

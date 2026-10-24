@@ -114,9 +114,22 @@ export default function Dashboard() {
       setLoginError("Veza sa aplikacijom nije dostupna.");
       setLoading(false);
     });
-    const timer = setInterval(() => void refresh().catch(() => {}), 3000);
-    return () => clearInterval(timer);
-  }, [refresh, tab]);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refresh().catch(() => {});
+      }
+    }, 20000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refresh().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refresh]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (!params.has("google")) return;
@@ -267,14 +280,26 @@ export default function Dashboard() {
   if (loading)
     return (
       <div className="login-screen">
-        <span className="brand">Štreberaj</span>
+        <span className="brand">
+          <img
+            src="/streberaj-logo.png"
+            alt="Štreberaj"
+            className="brand-logo login-logo"
+          />
+        </span>
         <p className="muted">Učitavanje…</p>
       </div>
     );
   if (!view)
     return (
       <div className="login-screen">
-        <span className="brand">Štreberaj</span>
+        <span className="brand">
+          <img
+            src="/streberaj-logo.png"
+            alt="Štreberaj"
+            className="brand-logo login-logo"
+          />
+        </span>
         <h1>Dobro došli</h1>
         <a className="btn primary" href="/auth/login">
           Prijavite se Google nalogom
@@ -298,8 +323,12 @@ export default function Dashboard() {
         refresh={refresh}
       />
       <aside className="sidebar">
-        <a className="brand" href="/">
-          Štreberaj
+        <a className="brand" href="/" title="Štreberaj">
+          <img
+            src="/streberaj-logo.png"
+            alt="Štreberaj"
+            className="brand-logo sidebar-logo"
+          />
         </a>
         <nav>
           {[

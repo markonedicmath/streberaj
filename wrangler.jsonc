@@ -9,6 +9,5 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "streberaj" }],
   "d1_databases": [{ "binding": "DB", "database_name": "streberaj-db", "database_id": "c980d0b8-9bb8-4522-93f3-25b17bbe0cdd", "migrations_dir": "migrations" }],
-  "vars": { "MANOJLO_STORAGE": "d1", "MANOJLO_AUTH": "google", "MANOJLO_LOCAL_DEMO": "0", "APP_URL": "https://streberaj.mnedictxt.workers.dev" },
-  "triggers": { "crons": ["* * * * *"] }
+  "vars": { "MANOJLO_STORAGE": "d1", "MANOJLO_AUTH": "google", "MANOJLO_LOCAL_DEMO": "0", "APP_URL": "https://streberaj.mnedictxt.workers.dev" }
 }
