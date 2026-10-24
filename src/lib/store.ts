@@ -1,9 +1,9 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { SchoolState } from "./types";
-import { localState, emptyState } from "./seed";
+import { emptyState } from "./seed";
+import { readCloudflareState, saveCloudflareState } from "./cloudflare-store";
 import { DomainError, id } from "./domain";
 import { normalizeStaffColors, STAFF_COLORS } from "./staff-colors";
 import { applySchoolDefaults } from "./school-defaults";
@@ -37,16 +37,7 @@ export function service() {
   );
 }
 async function sqlite() {
-  const { DatabaseSync } = await import("node:sqlite");
-  mkdirSync(dataDirectory(), { recursive: true });
-  const db = new DatabaseSync(path.join(dataDirectory(), "school.sqlite"));
-  db.exec(
-    "PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS school (id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL, data TEXT NOT NULL)",
-  );
-  db.prepare("INSERT OR IGNORE INTO school VALUES (1,0,?)").run(
-    JSON.stringify(localState()),
-  );
-  return db;
+  return (await import("./local-db")).localDatabase(dataDirectory());
 }
 export async function readState(): Promise<SchoolState> {
   if (isDemo()) {
@@ -81,7 +72,9 @@ export async function readState(): Promise<SchoolState> {
       db.close();
     }
   }
-  const { data, error } = await service()
+  let cloudState: SchoolState | null = null;
+  if (process.env.MANOJLO_STORAGE === "d1") cloudState = await readCloudflareState();
+  const { data, error } = process.env.MANOJLO_STORAGE === "d1" ? { data: { data: cloudState ?? emptyState(), revision: cloudState?.revision ?? 0 }, error: null } : await service()
     .from("school_state")
     .select("data,revision")
     .eq("id", true)
@@ -133,6 +126,7 @@ export async function compareAndSwap(
   state: SchoolState,
   revision: number,
 ): Promise<boolean> {
+  if (process.env.MANOJLO_STORAGE === "d1") return saveCloudflareState(state, revision);
   if (isDemo()) {
     const db = await sqlite();
     try {

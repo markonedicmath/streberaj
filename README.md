@@ -71,9 +71,24 @@ Tabela u „Obračunu” podržava izbor pojedinačnih redova, svih prikazanih �
 
 Pregled zahteva iz razgovora nalazi se u [PREGLED-ZAHTEVA.md](PREGLED-ZAHTEVA.md).
 
-## Plan objavljivanja: Cloudflare
+## Objavljivanje: Cloudflare
 
-Cilj je Cloudflare Workers sa zajedničkom D1 bazom za tekstualne podatke i direktnom Google prijavom. Supabase nije obavezan deo izabrane arhitekture. Adapter za Cloudflare/D1 i zamena postojećeg produkcijskog adaptera još nisu implementirani; lokalni rad trenutno koristi SQLite. Google tabela ostaje izvor za čitanje rasporeda. Bez otpremanja priloga nije potreban R2 ili drugi servis za datoteke.
+Aplikacija koristi Cloudflare Workers, zajedničku D1 bazu i direktnu Google prijavu. Javna adresa je `https://streberaj.mnedictxt.workers.dev`. Supabase nije potreban. Lokalni razvoj i dalje koristi SQLite; lokalna baza se ne prenosi automatski pri objavljivanju koda. Google tabela ostaje izvor za čitanje rasporeda. R2 i skladište priloga nisu potrebni.
+
+`wrangler.jsonc` povezuje Worker sa bazom i uključuje minutnu proveru Google tabele, čak i kada niko nema otvorenu aplikaciju. Tajne `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY` i `CRON_SECRET` čuvaju se u Cloudflare secrets. `APP_URL` mora odgovarati javnoj adresi. Google OAuth klijent ima povratne adrese `/auth/callback` i `/api/google/callback` na istom domenu. Lokalni režim ostaje isključen u produkciji.
+
+Za sledeće objavljivanje koda, iz prijavljenog Wrangler okruženja:
+
+```powershell
+npm ci
+npm run deploy
+```
+
+Produkcijski build koristi OpenNext i webpack. Windows može zahtevati WSL ukoliko OpenNext prijavi grešku platforme. Ne pokretati razvojni server nad istim `.next` direktorijumom tokom builda.
+
+Jednokratni prenos lokalne baze: `node --env-file=.env.local scripts/cloudflare-prepare.mjs` pravi konzistentnu rezervnu kopiju i privatne datoteke u ignorisanom `.data` direktorijumu. `cloudflare-seed.sql` namenjen je isključivo novoj praznoj D1 bazi, posle primene migracija; postojeća produkcijska revizija se ne prepisuje. Prenos čuva identifikatore, uplate, predaje, istoriju, brojače i šifrovanu Google vezu. Sačuvati isti ključ za šifrovanje. Priprema dodaje odobrenog administratora Marko Nedić (`markonedicmath@gmail.com`); stvarne adrese zaposlenih dodaju se kroz administraciju. Priprema nije deo redovnog deploy-a.
+
+D1 čuva stanje u delovima, sa atomskom proverom revizije, radi zaštite istovremenih izmena. Prazna ili nepotpuna revizija ne zamenjuje postojeće podatke. Sinhronizacija čita samo nedeljne kartice, u grupama od četiri, opseg `A1:O110` prema postojećem šablonu; time se izbegava preuzimanje hiljada praznih formatiranih redova. Ako se šablon proširi izvan tog opsega, prilagoditi uvoz.
 
 ### Postojeća alternativna implementacija preko Supabase-a
 

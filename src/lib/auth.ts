@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { DomainError } from "./domain";
 import { isDemo, configured, readState } from "./store";
 import type { SchoolState } from "./types";
+import { directGoogleAuth, googleSession } from "./google-login";
 export function localRequest(request: Request) {
   return ["localhost", "127.0.0.1", "[::1]"].includes(
     new URL(request.url).hostname,
@@ -40,6 +41,12 @@ export async function authenticate(request: Request, state?: SchoolState) {
       (e) => e.role === "admin" && e.active,
     );
     if (administrator) return administrator;
+  }
+  if (directGoogleAuth()) {
+    const session = await googleSession();
+    const actor = s.employees.find((employee) => employee.id === session.actorId && employee.active && employee.email.toLowerCase() === session.email);
+    if (!actor) throw new DomainError("Vaš nalog nije na listi odobrenih zaposlenih.",403);
+    return actor;
   }
   const client = await authClient();
   const {

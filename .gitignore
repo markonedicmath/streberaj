@@ -7,3 +7,7 @@ node_modules/
 *.tsbuildinfo
 test-results/
 playwright-report/
+.open-next/
+.wrangler/
+.dev.vars*
+cloudflare-env.d.ts

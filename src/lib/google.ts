@@ -172,14 +172,34 @@ async function runSynchronization(resetBoard?: {
   try {
     const fields =
       "sheets(properties(sheetId,title),merges,data(startRow,startColumn,rowData(values(formattedValue,effectiveValue,effectiveFormat(backgroundColor,backgroundColorStyle),userEnteredFormat(backgroundColor)))))";
-    const document = (await google(
-      initial,
-      "https://sheets.googleapis.com/v4/spreadsheets/" +
-        encodeURIComponent(sheet) +
-        "?includeGridData=true&fields=" +
-        encodeURIComponent(fields),
-    )) as SheetsDocument;
-    const blocks = parseSheets(document, initial.sync.firstYear);
+    const endpoint = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(sheet);
+    // The source has formatting far beyond its timetable. Reading the whole
+    // workbook can exceed a Worker's memory before JSON parsing even starts.
+    const metadata = await google(initial, endpoint + "?fields=sheets(properties(sheetId,title))") as SheetsDocument;
+    let year = initial.sync.firstYear, previousMonth = 0;
+    const weeks: { title: string; year: number }[] = [];
+    for (const tab of metadata.sheets) {
+      const match = tab.properties.title.match(/^(\d{1,2})\.(\d{1,2})\.?\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.?$/);
+      if (!match) continue;
+      const month = Number(match[2]);
+      if (previousMonth && month < previousMonth) year++;
+      previousMonth = month;
+      weeks.push({ title: tab.properties.title, year });
+    }
+    if (!weeks.length) throw new DomainError("Nema nedeljnih kartica oblika 19.10–25.10.");
+    const blocks: ReturnType<typeof parseSheets> = [];
+    for (let offset = 0; offset < weeks.length; offset += 4) {
+      const batch = weeks.slice(offset, offset + 4);
+      const query = new URLSearchParams({ includeGridData: "true", fields });
+      // Two header rows plus 96 quarter-hour rows cover even a full day.
+      for (const week of batch) query.append("ranges", "'" + week.title.replaceAll("'", "''") + "'!A1:O110");
+      const document = await google(initial, endpoint + "?" + query) as SheetsDocument;
+      for (const week of batch) {
+        const tab = document.sheets.find((tab) => tab.properties.title === week.title);
+        if (!tab) throw new DomainError("Nedeljna kartica je promenjena tokom uvoza. Ponovite uvoz.",409);
+        blocks.push(...parseSheets({ sheets: [tab] }, week.year));
+      }
+    }
     const { state } = await transact((s) => {
       if (
         s.sync.spreadsheetId !== sheet ||

@@ -1,7 +1,9 @@
 import { authClient } from "@/lib/auth";
 import { failure } from "@/lib/http";
+import { directGoogleAuth, finishGoogleLogin } from "@/lib/google-login";
 export async function GET(request: Request) {
   try {
+    if (directGoogleAuth()) return await finishGoogleLogin(request);
     const code = new URL(request.url).searchParams.get("code");
     if (!code)
       return Response.redirect(new URL("/?login=failed", request.url), 303);
