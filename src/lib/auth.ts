@@ -32,6 +32,11 @@ export async function authClient() {
 }
 export async function authenticate(request: Request, state?: SchoolState) {
   const s = state ?? (await readState());
+  const troubleshootActor = (await cookies()).get("streberaj-troubleshoot-actor")?.value;
+  if (troubleshootActor) {
+    const actor = s.employees.find((e) => e.id === troubleshootActor && e.active);
+    if (actor) return actor;
+  }
   if (isDemo() && localRequest(request)) {
     const selected = (await cookies()).get("demo-actor")?.value ?? "admin";
     const actor = s.employees.find((e) => e.id === selected && e.active);

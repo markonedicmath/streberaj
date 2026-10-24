@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { readState, isDemo } from "@/lib/store";
 import { authenticate } from "@/lib/auth";
 import { project } from "@/lib/domain";
@@ -7,7 +8,8 @@ export async function GET(request: Request) {
   try {
     const state = await readState(),
       actor = await authenticate(request, state);
-    return json(project(state, actor, isDemo()));
+    const hasTroubleshoot = (await cookies()).has("streberaj-troubleshoot-actor");
+    return json(project(state, actor, isDemo() || hasTroubleshoot));
   } catch (e) {
     return failure(e);
   }

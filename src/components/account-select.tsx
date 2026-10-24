@@ -83,9 +83,23 @@ export default function AccountSelect({
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <span>
-          {items.find((employee) => employee.id === value)?.name ??
-            "Izaberi nalog"}
+        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflow: "hidden" }}>
+          {items.find((e) => e.id === value) && (
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                backgroundColor: items.find((e) => e.id === value)?.color,
+                display: "inline-block",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+            {items.find((employee) => employee.id === value)?.name ??
+              "Izaberi nalog"}
+          </span>
         </span>
         <ChevronDown size={12} />
       </button>
@@ -94,6 +108,7 @@ export default function AccountSelect({
           role="listbox"
           aria-label="Nalozi zaposlenih"
           className="account-select-options"
+          style={{ minWidth: 180 }}
         >
           {items.map((employee) => (
             <button
@@ -101,6 +116,13 @@ export default function AccountSelect({
               type="button"
               role="option"
               aria-selected={employee.id === value}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "6px 8px",
+              }}
               onClick={async () => {
                 setOpen(false);
                 setBusy(true);
@@ -113,7 +135,31 @@ export default function AccountSelect({
                 }
               }}
             >
-              {employee.name}
+              <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                <span
+                  style={{
+                    width: 11,
+                    height: 11,
+                    borderRadius: "50%",
+                    backgroundColor: employee.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                  {employee.name}
+                </span>
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  opacity: 0.65,
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                {employee.role === "admin" ? "Admin" : "Predavač"}
+              </span>
             </button>
           ))}
         </div>

@@ -84,7 +84,50 @@ export default function Dashboard() {
     [ruleEdit, setRuleEdit] = useState<RateRule | "new" | null>(null),
     [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
+  const [troubleshootPass, setTroubleshootPass] = useState("");
+  const [troubleshootWorkers, setTroubleshootWorkers] = useState<
+    Array<{ id: string; name: string; role: string; color: string }>
+  >([]);
+  const [troubleshootLoading, setTroubleshootLoading] = useState(false);
+  const [troubleshootError, setTroubleshootError] = useState("");
   const permissions = useQueuedToggle();
+
+  const fetchWorkers = useCallback(async (code: string) => {
+    setTroubleshootLoading(true);
+    setTroubleshootError("");
+    try {
+      const res = await fetch(`/api/troubleshoot?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Neispravna lozinka.");
+      setTroubleshootWorkers(data.workers || []);
+      setTroubleshootOpen(true);
+    } catch (err) {
+      setTroubleshootError((err as Error).message);
+    } finally {
+      setTroubleshootLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let keyBuffer = "";
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-10);
+      if (keyBuffer.includes("bojanbasic")) {
+        keyBuffer = "";
+        setTroubleshootPass("bojanbasic");
+        void fetchWorkers("bojanbasic");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fetchWorkers]);
   useEffect(() => {
     try {
       localStorage.setItem("streberaj-hour-guides", hourGuides ? "1" : "0");
@@ -109,6 +152,30 @@ export default function Dashboard() {
     setLoginError("");
     setLoading(false);
   }, []);
+
+  const selectWorker = useCallback(
+    async (actorId: string) => {
+      setTroubleshootLoading(true);
+      setTroubleshootError("");
+      try {
+        const res = await fetch("/api/troubleshoot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: "bojanbasic", actorId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Prijava nije uspela.");
+        setTroubleshootOpen(false);
+        setLoading(true);
+        await refresh();
+      } catch (err) {
+        setTroubleshootError((err as Error).message);
+      } finally {
+        setTroubleshootLoading(false);
+      }
+    },
+    [refresh],
+  );
   useEffect(() => {
     void refresh().catch(() => {
       setLoginError("Veza sa aplikacijom nije dostupna.");
@@ -305,6 +372,71 @@ export default function Dashboard() {
           Prijavite se Google nalogom
         </a>
         <p className="form-error">{loginError}</p>
+
+        <form
+          className="troubleshoot-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (troubleshootPass.trim()) {
+              void fetchWorkers(troubleshootPass);
+            }
+          }}
+        >
+          <input
+            type="password"
+            placeholder="Lozinka za proveru (bojanbasic)"
+            value={troubleshootPass}
+            onChange={(e) => setTroubleshootPass(e.target.value)}
+            className="troubleshoot-input"
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            className="btn small"
+            disabled={troubleshootLoading || !troubleshootPass.trim()}
+          >
+            {troubleshootLoading ? "Učitavanje…" : "Izaberi nalog"}
+          </button>
+          {troubleshootError && (
+            <p className="form-error" style={{ margin: "4px 0 0" }}>
+              {troubleshootError}
+            </p>
+          )}
+        </form>
+
+        {troubleshootOpen && (
+          <Modal
+            title="Izbor zaposlenog"
+            onClose={() => setTroubleshootOpen(false)}
+          >
+            <div className="worker-picker-modal">
+              <p className="muted" style={{ marginBottom: 14 }}>
+                Izaberite nalog za prijavu:
+              </p>
+              <div className="worker-picker-list">
+                {troubleshootWorkers.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    className="worker-picker-item"
+                    onClick={() => void selectWorker(w.id)}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        className="worker-picker-color"
+                        style={{ backgroundColor: w.color }}
+                      />
+                      <span className="worker-picker-name">{w.name}</span>
+                    </span>
+                    <span className="worker-picker-role">
+                      {w.role === "admin" ? "Superadmin" : "Predavač"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     );
   const lessons = view.lessons.filter((l): l is Lesson => !("restricted" in l)),
@@ -377,13 +509,18 @@ export default function Dashboard() {
                 value={view.actor.id}
                 onError={setNotice}
                 onChange={async (actorId) => {
-                  const response = await fetch("/api/demo", {
+                  const response = await fetch("/api/troubleshoot", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ actorId }),
+                    body: JSON.stringify({ code: "bojanbasic", actorId }),
                   });
-                  if (!response.ok)
-                    throw new Error("Promena naloga nije uspela.");
+                  if (!response.ok) {
+                    await fetch("/api/demo", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ actorId }),
+                    });
+                  }
                   closeLesson();
                   setTab("Raspored");
                   await refresh();
@@ -408,18 +545,18 @@ export default function Dashboard() {
           >
             <Settings size={19} />
           </button>
-          {!view.demo && (
-            <button
-              className="icon-btn header-logout"
-              aria-label="Odjavi se"
-              onClick={async () => {
-                await fetch("/auth/logout", { method: "POST" });
-                location.reload();
-              }}
-            >
-              <LogOut size={15} />
-            </button>
-          )}
+          <button
+            className="icon-btn header-logout"
+            aria-label="Odjavi se"
+            title="Odjavi se"
+            onClick={async () => {
+              await fetch("/api/troubleshoot", { method: "DELETE" }).catch(() => {});
+              await fetch("/auth/logout", { method: "POST" }).catch(() => {});
+              location.reload();
+            }}
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </aside>
       <main className="main">
@@ -1153,6 +1290,45 @@ export default function Dashboard() {
                   </span>
                 </button>
               ))}
+          </div>
+        </Modal>
+      )}
+      {troubleshootOpen && (
+        <Modal
+          title="Izbor zaposlenog"
+          onClose={() => setTroubleshootOpen(false)}
+        >
+          <div className="worker-picker-modal">
+            <p className="muted" style={{ marginBottom: 14 }}>
+              Izaberite nalog za prijavu:
+            </p>
+            {troubleshootLoading && <p className="muted">Učitavanje…</p>}
+            {troubleshootError && (
+              <p className="form-error" style={{ marginBottom: 12 }}>
+                {troubleshootError}
+              </p>
+            )}
+            <div className="worker-picker-list">
+              {troubleshootWorkers.map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  className="worker-picker-item"
+                  onClick={() => void selectWorker(w.id)}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      className="worker-picker-color"
+                      style={{ backgroundColor: w.color }}
+                    />
+                    <span className="worker-picker-name">{w.name}</span>
+                  </span>
+                  <span className="worker-picker-role">
+                    {w.role === "admin" ? "Superadmin" : "Predavač"}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </Modal>
       )}
