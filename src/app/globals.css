@@ -3605,11 +3605,30 @@ body.calendar-grabbing * {
   font-size: clamp(11px, 14cqi, 15px);
   line-height: 1.15;
 }
+.lesson-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: auto;
+  gap: 4px;
+}
+.lesson-footer .lesson-teacher {
+  margin-top: 0;
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lesson-footer .lesson-counter,
+.lesson-footer .lesson-counter .package-counter,
+.lesson-footer .lesson-counter .package-counter input,
 .lesson-block .lesson-counter,
 .lesson-block .lesson-counter .package-counter input {
-  font-size: var(--lesson-counter-size, 21px) !important;
+  font-size: 10px !important;
   line-height: 1.1;
-  font-weight: 800;
+  font-weight: 700;
 }
 .lesson-block .lesson-teacher {
   font-size: 10px;
@@ -3627,8 +3646,8 @@ body.calendar-grabbing * {
 }
 .lesson-block.very-short-lesson .lesson-counter,
 .lesson-block.very-short-lesson .lesson-counter input {
-  font-size: 15px !important;
-  line-height: 16px;
+  font-size: 9px !important;
+  line-height: 12px;
 }
 .lesson-block.very-short-lesson .lesson-minutes {
   display: inline;
@@ -3638,11 +3657,11 @@ body.calendar-grabbing * {
 }
 .lesson-block.tiny-lesson .lesson-counter,
 .lesson-block.tiny-lesson .lesson-counter input {
-  font-size: 11px !important;
+  font-size: 9px !important;
   line-height: 11px;
 }
 .lesson-counter .package-counter input {
-  font-size: 14px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 16px;
 }
@@ -4304,6 +4323,44 @@ body {
   border-bottom: 1px solid var(--line);
   border-top: 0;
 }
+.sidebar-top-row {
+  display: contents;
+}
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+.teacher-direct-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.teacher-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.day-head .day-head-collapsed {
+  display: none;
+}
+.lesson-block.touch-held {
+  transform: scale(1.02);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  z-index: 50 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
 .sidebar > .brand {
   display: block;
   font-size: 20px;
@@ -4604,30 +4661,167 @@ textarea {
     padding-right: 500px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
+  body {
+    overflow-x: clip;
+  }
+  .app-shell,
+  .main,
+  .schedule-layout,
+  .schedule-card,
+  .content-card {
+    min-width: 0;
+    max-width: 100%;
+  }
   .sidebar {
-    height: 84px;
-    padding: 0 10px;
-    gap: 0 10px;
-    flex-wrap: wrap;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #fff !important;
+    border-bottom: 1px solid var(--line) !important;
+    border-right: 0 !important;
+    gap: 0 !important;
   }
-  .sidebar > .brand {
-    font-size: 19px;
+  .sidebar-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    height: 42px !important;
+    padding: 0 8px !important;
+    border-bottom: 1px solid #f0f2f5 !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
   }
-  .sidebar > .profile {
-    margin-left: auto;
+  .brand-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    min-width: 0 !important;
+  }
+  .sidebar-logo {
+    max-height: 24px !important;
+    max-width: 95px !important;
+    object-fit: contain !important;
+  }
+  .header-undo-redo {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    margin-left: 2px !important;
+  }
+  .header-icon-btn {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    border: 1px solid #d0d7de !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #333 !important;
+  }
+  .header-icon-btn:disabled {
+    opacity: 0.35 !important;
+  }
+  .profile-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+  }
+  .sidebar > .profile,
+  .sidebar .profile {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+  .sidebar .profile .account-select {
+    width: auto !important;
+    max-width: 125px !important;
+    min-width: 0 !important;
+    font-size: 12px !important;
+  }
+  .sidebar .profile .account-select-trigger {
+    padding: 2px 4px !important;
+    min-height: 28px !important;
+    gap: 4px !important;
+    font-size: 12px !important;
+  }
+  .sidebar .profile strong {
+    display: block;
+    line-height: 14px;
+    overflow-wrap: anywhere;
+  }
+  .teacher-direct-label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 120px !important;
+  }
+  .teacher-color-dot {
+    width: 9px !important;
+    height: 9px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+  }
+  .sidebar .settings-button {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+  .header-logout {
+    display: none !important;
   }
   .sidebar nav {
-    order: 3;
-    flex: 0 0 100%;
-    height: 38px;
-    gap: 0;
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: 38px !important;
+    padding: 0 4px !important;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 0 !important;
   }
   .sidebar nav button {
-    font-size: 12px;
-    padding: 0 11px;
-    min-width: auto;
-    justify-content: center;
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    padding: 0 4px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    justify-content: center !important;
+    border-radius: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    color: #57606a !important;
+    white-space: nowrap !important;
+  }
+  .sidebar nav button.active {
+    border-bottom: 2px solid #202124 !important;
+    color: #202124 !important;
+    font-weight: 600 !important;
   }
   .activity-notification-card {
     gap: 2px;
@@ -4653,31 +4847,26 @@ textarea {
     padding: 12px;
   }
   .main:has(.schedule-layout) {
-    height: calc(100dvh - 84px);
-    padding: 0;
-  }
-  .header-undo-redo {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: 6px;
+    height: calc(100dvh - 80px) !important;
+    padding: 0 !important;
   }
   .schedule-toolbar {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 6px 8px !important;
-    gap: 2px !important;
+    padding: 8px 10px !important;
+    gap: 6px !important;
     flex-wrap: nowrap !important;
     width: 100% !important;
-    background: #fff;
-    border-bottom: 1px solid var(--line, #e2e8f0);
+    min-height: 52px !important;
+    background: #fff !important;
+    border-bottom: 1px solid var(--line, #e2e8f0) !important;
   }
   .toolbar-left-group {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    flex: 1 1 0% !important;
+    gap: 8px !important;
+    flex: 1 1 auto !important;
     min-width: 0 !important;
   }
   .week-nav-compact {
@@ -4685,6 +4874,7 @@ textarea {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 1px !important;
+    flex-shrink: 0 !important;
   }
   .compact-arrows-row {
     display: flex !important;
@@ -4692,15 +4882,29 @@ textarea {
     gap: 2px !important;
   }
   .compact-nav-arrow {
-    width: 20px !important;
-    height: 20px !important;
+    width: 22px !important;
+    height: 22px !important;
+    padding: 0 !important;
   }
   .week-range-label {
     font-size: 11px !important;
+    font-weight: 500 !important;
     line-height: 1.1 !important;
+    color: #333 !important;
+    white-space: nowrap !important;
   }
   .desktop-month-only {
     display: none !important;
+  }
+  .online-toggle {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-size: 12px !important;
+    color: #333 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    margin-left: 2px !important;
   }
   .toolbar-center-group {
     display: flex !important;
@@ -4709,13 +4913,47 @@ textarea {
     flex: 0 0 auto !important;
     margin: 0 4px !important;
   }
+  .toolbar-add-btn {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background: #2b2c2e !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22) !important;
+    cursor: pointer !important;
+  }
+  .toolbar-add-btn:active {
+    transform: scale(0.94) !important;
+  }
   .toolbar-right-group {
     display: flex !important;
     align-items: center !important;
     justify-content: flex-end !important;
-    gap: 5px !important;
-    flex: 1 1 0% !important;
+    gap: 6px !important;
+    flex: 1 1 auto !important;
     min-width: 0 !important;
+  }
+  .toolbar-today-toggle {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border: 1px solid #d0d7de !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #24292f !important;
+    white-space: nowrap !important;
+  }
+  .svi-toggle {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-size: 12px !important;
+    color: #333 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
   }
   .desktop-extra-controls {
     display: none !important;
@@ -4726,49 +4964,38 @@ textarea {
   .mobile-add-class {
     display: none !important;
   }
-}
-@media (max-width: 760px) {
-  body {
-    overflow-x: clip;
-  }
-  .app-shell,
-  .main,
-  .schedule-layout,
-  .schedule-card,
-  .content-card {
-    min-width: 0;
-    max-width: 100%;
-  }
-  .sidebar {
-    gap: 0 6px;
-  }
-  .sidebar > .profile {
-    gap: 3px;
-  }
-  .sidebar .profile > div {
-    width: 116px;
-    min-width: 0;
-  }
-  .sidebar .profile strong {
-    display: block;
-    line-height: 14px;
-    overflow-wrap: anywhere;
-  }
-  .header-logout {
-    display: none;
-  }
-  .sidebar nav {
-    overflow-x: visible;
-  }
-  .sidebar nav button {
-    flex: 1;
-    min-width: 0;
-    padding: 0 4px;
-    font-size: 11px;
-  }
   .teacher-filters {
     flex-wrap: wrap;
     overflow: visible;
+  }
+  .day-head:not(.is-collapsed) .day-head-collapsed {
+    display: none !important;
+  }
+  .day-head.is-collapsed {
+    padding-top: 3px !important;
+  }
+  .day-head.is-collapsed .day-head-full {
+    display: none !important;
+  }
+  .day-head.is-collapsed .day-head-collapsed {
+    display: block !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    line-height: 16px !important;
+    color: #202124 !important;
+    padding: 1px 0 !important;
+    text-align: center !important;
+  }
+  .day-head.is-collapsed.today .day-head-collapsed {
+    color: #2e5927 !important;
+  }
+  .day-head.is-collapsed .desk-labels span {
+    font-size: 10px !important;
+    padding: 3px 0 !important;
+    line-height: 14px !important;
+  }
+  .time-head.is-collapsed {
+    padding-top: 2px !important;
   }
   .calendar-grid:not(.single-day) {
     grid-template-columns: 38px repeat(7, minmax(150px, 1fr)) !important;

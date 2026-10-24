@@ -636,58 +636,149 @@ export default function Dashboard() {
         refresh={refresh}
       />
       <aside className="sidebar">
-        <a className="brand" href="/" title="Štreberaj">
-          <img
-            src="/streberaj-logo.png"
-            alt="Štreberaj"
-            className="brand-logo sidebar-logo"
-          />
-        </a>
+        <div className="sidebar-top-row">
+          <div className="brand-group">
+            <a className="brand" href="/" title="Štreberaj">
+              <img
+                src="/streberaj-logo.png"
+                alt="Štreberaj"
+                className="brand-logo sidebar-logo"
+              />
+            </a>
 
-        {/* Undo and Redo icon buttons for phone top bar */}
-        <div className="header-undo-redo">
-          <button
-            type="button"
-            className="header-icon-btn"
-            aria-label="Poništi"
-            title={
-              view.undoLabel
-                ? "Poništi: " + view.undoLabel + " (Ctrl + Z)"
-                : "Nema izmene za poništavanje"
-            }
-            disabled={!view.undoLabel}
-            onClick={async () => {
-              try {
-                await command("undo", {});
-                closeLesson();
-              } catch (e) {
-                setNotice((e as Error).message);
-              }
-            }}
-          >
-            <Undo2 size={18} />
-          </button>
-          <button
-            type="button"
-            className="header-icon-btn"
-            aria-label="Ponovi"
-            title={
-              view.redoLabel
-                ? "Ponovi: " + view.redoLabel + " (Ctrl + Shift + Z)"
-                : "Nema radnje za ponavljanje"
-            }
-            disabled={!view.redoLabel}
-            onClick={async () => {
-              try {
-                await command("redo", {});
-                closeLesson();
-              } catch (e) {
-                setNotice((e as Error).message);
-              }
-            }}
-          >
-            <Redo2 size={18} />
-          </button>
+            {/* Undo and Redo icon buttons for phone top bar */}
+            <div className="header-undo-redo">
+              <button
+                type="button"
+                className="header-icon-btn"
+                aria-label="Poništi"
+                title={
+                  view.undoLabel
+                    ? "Poništi: " + view.undoLabel + " (Ctrl + Z)"
+                    : "Nema izmene za poništavanje"
+                }
+                disabled={!view.undoLabel}
+                onClick={async () => {
+                  try {
+                    await command("undo", {});
+                    closeLesson();
+                  } catch (e) {
+                    setNotice((e as Error).message);
+                  }
+                }}
+              >
+                <Undo2 size={18} />
+              </button>
+              <button
+                type="button"
+                className="header-icon-btn"
+                aria-label="Ponovi"
+                title={
+                  view.redoLabel
+                    ? "Ponovi: " + view.redoLabel + " (Ctrl + Shift + Z)"
+                    : "Nema radnje za ponavljanje"
+                }
+                disabled={!view.redoLabel}
+                onClick={async () => {
+                  try {
+                    await command("redo", {});
+                    closeLesson();
+                  } catch (e) {
+                    setNotice((e as Error).message);
+                  }
+                }}
+              >
+                <Redo2 size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="profile-group">
+            <ActivityNotifications
+              view={view}
+              notice={notice}
+              onConsume={() => setNotice("")}
+              enabled={view.actor.preferences?.notifications ?? true}
+              soundEnabled={view.actor.preferences?.sound ?? false}
+            />
+            <div className="profile">
+              <span
+                className="avatar"
+                style={{
+                  background: view.actor.color,
+                  color: textForColor(view.actor.color),
+                }}
+              >
+                {view.actor.name[0]}
+              </span>
+              <div>
+                {view.demo ? (
+                  <AccountSelect
+                    employees={view.employees}
+                    value={view.actor.id}
+                    onError={setNotice}
+                    onChange={async (actorId) => {
+                      try {
+                        const response = await fetch("/api/troubleshoot", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ code: "bojanbasic", actorId }),
+                        });
+                        const parsed = await parseResponse(response);
+                        if (!parsed.ok) {
+                          await fetch("/api/demo", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ actorId }),
+                          }).catch(() => {});
+                        }
+                        closeLesson();
+                        setTab("Raspored");
+                        await refresh();
+                      } catch (e) {
+                        setNotice((e as Error).message);
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="teacher-direct-label">
+                    <span
+                      className="teacher-color-dot"
+                      style={{ backgroundColor: view.actor.color }}
+                    />
+                    <strong>{view.actor.name}</strong>
+                  </div>
+                )}
+                <small>
+                  {view.actor.role === "admin" ? "Superadministrator" : "Predavač"}
+                </small>
+              </div>
+              <button
+                type="button"
+                className="icon-btn settings-button"
+                aria-label="Podešavanja"
+                title="Podešavanja"
+                onClick={() => {
+                  closeLesson();
+                  setSettingsOpen(true);
+                }}
+              >
+                <Settings size={19} />
+              </button>
+              <button
+                className="icon-btn header-logout"
+                aria-label="Odjavi se"
+                title="Odjavi se"
+                onClick={async () => {
+                  await fetch("/api/troubleshoot", { method: "DELETE" }).catch(() => {});
+                  await fetch("/auth/logout", { method: "POST" }).catch(() => {});
+                  location.reload();
+                }}
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          </div>
         </div>
         <nav>
           {[
@@ -717,84 +808,6 @@ export default function Dashboard() {
             </button>
           ))}
         </nav>
-        <ActivityNotifications
-          view={view}
-          notice={notice}
-          onConsume={() => setNotice("")}
-          enabled={view.actor.preferences?.notifications ?? true}
-          soundEnabled={view.actor.preferences?.sound ?? false}
-        />
-        <div className="profile">
-          <span
-            className="avatar"
-            style={{
-              background: view.actor.color,
-              color: textForColor(view.actor.color),
-            }}
-          >
-            {view.actor.name[0]}
-          </span>
-          <div>
-            {view.demo ? (
-              <AccountSelect
-                employees={view.employees}
-                value={view.actor.id}
-                onError={setNotice}
-                onChange={async (actorId) => {
-                  try {
-                    const response = await fetch("/api/troubleshoot", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ code: "bojanbasic", actorId }),
-                    });
-                    const parsed = await parseResponse(response);
-                    if (!parsed.ok) {
-                      await fetch("/api/demo", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ actorId }),
-                      }).catch(() => {});
-                    }
-                    closeLesson();
-                    setTab("Raspored");
-                    await refresh();
-                  } catch (e) {
-                    setNotice((e as Error).message);
-                  }
-                }}
-              />
-            ) : (
-              <strong>{view.actor.name}</strong>
-            )}
-            <small>
-              {view.actor.role === "admin" ? "Superadministrator" : "Predavač"}
-            </small>
-          </div>
-          <button
-            type="button"
-            className="icon-btn settings-button"
-            aria-label="Podešavanja"
-            title="Podešavanja"
-            onClick={() => {
-              closeLesson();
-              setSettingsOpen(true);
-            }}
-          >
-            <Settings size={19} />
-          </button>
-          <button
-            className="icon-btn header-logout"
-            aria-label="Odjavi se"
-            title="Odjavi se"
-            onClick={async () => {
-              await fetch("/api/troubleshoot", { method: "DELETE" }).catch(() => {});
-              await fetch("/auth/logout", { method: "POST" }).catch(() => {});
-              location.reload();
-            }}
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
       </aside>
       <main className="main">
         {tab === "Raspored" ? (

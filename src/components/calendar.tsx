@@ -36,6 +36,15 @@ const DAYS = [
   "Subota",
   "Nedelja",
 ];
+const DAYS_SHORT = [
+  "Pon",
+  "Uto",
+  "Sre",
+  "Čet",
+  "Pet",
+  "Sub",
+  "Ned",
+];
 type Move = Pick<Lesson, "date" | "start" | "duration" | "desk" | "mode">;
 type Draft = {
   date: string;
@@ -122,7 +131,8 @@ export default function Calendar({
       width: number;
       height: number;
     } | null>(null),
-    [deleting, setDeleting] = useState(false);
+    [deleting, setDeleting] = useState(false),
+    [isScrolled, setIsScrolled] = useState(false);
   const anchor = useRef<string | null>(null);
   const previousTap = useRef<Tap | null>(null),
     touchOrigin = useRef<Tap | null>(null);
@@ -532,21 +542,38 @@ export default function Calendar({
       return;
     e.stopPropagation();
     cleanup.current();
-    const origin = (e.currentTarget as HTMLElement).closest<HTMLElement>(
-      "[data-lane-date]",
-    )!;
+
+    const isTouch = e.pointerType === "touch";
+    const lessonEl = e.currentTarget as HTMLElement;
+    const origin = lessonEl.closest<HTMLElement>("[data-lane-date]")!;
     const x = e.clientX,
       y = e.clientY,
       initial = minuteAt(y - origin.getBoundingClientRect().top, rows),
       offset = initial - l.start;
+
+    let isHeld = !isTouch || resize;
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let moved = false,
+      patches: Record<string, Move> = {};
+
+    if (isTouch && !resize) {
+      holdTimer = setTimeout(() => {
+        isHeld = true;
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          try {
+            navigator.vibrate(50);
+          } catch {}
+        }
+        lessonEl.classList.add("touch-held");
+        document.body.classList.add("calendar-grabbing");
+      }, 550);
+    }
+
     const group =
       !resize && selectedIds.has(l.id)
         ? editable.filter((item) => selectedIds.has(item.id))
         : [l];
-    if (!selectedIds.has(l.id)) {
-      setSelectedIds(new Set([l.id]));
-      anchor.current = l.id;
-    }
+
     const lanes = dates.flatMap((d) =>
       ([1, 2, ...(online ? [null] : [])] as (1 | 2 | null)[]).map((desk) => ({
         date: d.date,
@@ -560,14 +587,32 @@ export default function Calendar({
           col.date === lesson.date &&
           col.desk === (lesson.mode === "online" ? null : lesson.desk),
       );
-    let moved = false,
-      patches: Record<string, Move> = {};
+
     function move(ev: PointerEvent) {
-      if (!moved && Math.abs(ev.clientX - x) + Math.abs(ev.clientY - y) < 6)
+      const dist = Math.abs(ev.clientX - x) + Math.abs(ev.clientY - y);
+
+      // On touch devices, if finger moves > 8px before holding 550ms, user is scrolling!
+      if (isTouch && !isHeld) {
+        if (dist > 8) {
+          if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+          }
+          cleanup.current();
+          return;
+        }
         return;
+      }
+
+      if (!moved && dist < 6) return;
       moved = true;
       ev.preventDefault();
       document.body.classList.add("calendar-grabbing");
+
+      if (!selectedIds.has(l.id)) {
+        setSelectedIds(new Set([l.id]));
+        anchor.current = l.id;
+      }
       if (resize) {
         const delta =
           Math.round(
@@ -633,11 +678,15 @@ export default function Calendar({
       setPreview(patches);
     }
     function cancel() {
+      if (holdTimer) clearTimeout(holdTimer);
+      lessonEl.classList.remove("touch-held");
       cleanup.current();
       setPreview({});
       suppress.current = Date.now() + 400;
     }
     function end() {
+      if (holdTimer) clearTimeout(holdTimer);
+      lessonEl.classList.remove("touch-held");
       cleanup.current();
       if (!moved) return;
       suppress.current = Date.now() + 400;
@@ -709,6 +758,8 @@ export default function Calendar({
     window.addEventListener("pointerup", end, { once: true });
     window.addEventListener("pointercancel", cancel, { once: true });
     cleanup.current = () => {
+      if (holdTimer) clearTimeout(holdTimer);
+      lessonEl.classList.remove("touch-held");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", cancel);
@@ -910,19 +961,6 @@ export default function Calendar({
               ? l.studentName || "Čas"
               : student?.name || "Poveži učenika"}
           </strong>
-          {!restricted && student && (
-            <span className="lesson-counter">
-              <PackageCounter
-                student={student}
-                cycle={l.cycleNumbers?.[0] ?? student.cycle}
-                size={l.cycleSize ?? student.packageSize ?? 4}
-                onCorrect={(number, size, scope) =>
-                  onCounter(l.id, 0, number, size, scope)
-                }
-                onChange={(size) => onPackage(student.id, size)}
-              />
-            </span>
-          )}
         </div>
         {!restricted && (l.units ?? 1) > 1 && (
           <div className="lesson-units">
@@ -965,10 +1003,25 @@ export default function Calendar({
           paid={paid}
           maxFont={l.duration <= 45 ? 11 : Math.min(14, Math.max(10.5, h / 6))}
         />
-        <span className="lesson-teacher">
-          {employee.name.split(" ")[0]}
-          {!restricted && l.conflict && " · !"}
-        </span>
+        <div className="lesson-footer">
+          <span className="lesson-teacher">
+            {employee.name.split(" ")[0]}
+            {!restricted && l.conflict && " · !"}
+          </span>
+          {!restricted && student && (
+            <span className="lesson-counter">
+              <PackageCounter
+                student={student}
+                cycle={l.cycleNumbers?.[0] ?? student.cycle}
+                size={l.cycleSize ?? student.packageSize ?? 4}
+                onCorrect={(number, size, scope) =>
+                  onCounter(l.id, 0, number, size, scope)
+                }
+                onChange={(size) => onPackage(student.id, size)}
+              />
+            </span>
+          )}
+        </div>
         {!restricted && (
           <>
             <button
@@ -1028,11 +1081,14 @@ export default function Calendar({
         />
       )}
       <div
-        className="calendar-scroll"
+        className={"calendar-scroll " + (isScrolled ? "is-scrolled" : "")}
         ref={scroll}
         role="region"
         aria-label="Nedeljni raspored"
         tabIndex={0}
+        onScroll={(e) => {
+          setIsScrolled(e.currentTarget.scrollTop > 12);
+        }}
       >
         <div
           className={
@@ -1049,7 +1105,7 @@ export default function Calendar({
               "px, 1fr))",
           }}
         >
-          <div className="time-head">
+          <div className={"time-head " + (isScrolled ? "is-collapsed" : "")}>
             <button
               className="reset-rows"
               aria-label="Vrati podrazumevanu visinu svih redova"
@@ -1068,15 +1124,22 @@ export default function Calendar({
           {dates.map(({ date, i }) => (
             <div
               className={
-                "day-head " + (date === belgradeToday() ? "today" : "")
+                "day-head " +
+                (date === belgradeToday() ? "today " : "") +
+                (isScrolled ? "is-collapsed " : "")
               }
               key={date}
             >
-              <span>{DAYS[i]}</span>
-              <strong>
-                {Number(date.slice(8))}.
-                <small>{Number(date.slice(5, 7))}.</small>
-              </strong>
+              <div className="day-head-full">
+                <span>{DAYS[i]}</span>
+                <strong>
+                  {Number(date.slice(8))}.
+                  <small>{Number(date.slice(5, 7))}.</small>
+                </strong>
+              </div>
+              <div className="day-head-collapsed">
+                <span>{DAYS_SHORT[i]} {Number(date.slice(8))}.</span>
+              </div>
               <div className="desk-labels">
                 <span>Prvi sto</span>
                 <span>Drugi sto</span>
