@@ -765,7 +765,8 @@ h3 {
     border-right: 0;
     z-index: 40;
   }
-  .brand,
+  .sidebar > .brand,
+  .sidebar .brand,
   .workspace-label,
   .sidebar-note,
   .profile {
@@ -1642,9 +1643,19 @@ h3 {
   gap: 20px;
   padding: 25px;
 }
-.login-screen .brand {
-  font-size: 38px;
+.login-screen .brand,
+.login-logo-wrap {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 20px;
+}
+.login-logo {
+  max-width: 280px;
+  width: 75vw;
+  height: auto;
+  object-fit: contain;
+  display: block !important;
 }
 .login-btn {
   background: #303134 !important;
@@ -1664,22 +1675,29 @@ h3 {
   background: #202124 !important;
   border-color: #202124 !important;
 }
+.bojan-mobile-section {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 12px;
+}
+@media (max-width: 768px) {
+  .bojan-mobile-section {
+    display: flex;
+  }
+}
 .bojan-guy-wrapper {
   position: relative;
   width: 120px;
   height: 120px;
-  margin-top: 16px;
   cursor: pointer;
   border-radius: 6px;
   overflow: hidden;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  display: none;
-}
-@media (max-width: 768px) {
-  .bojan-guy-wrapper {
-    display: block;
-  }
+  display: block;
 }
 .bojan-guy {
   position: absolute;
@@ -1697,6 +1715,79 @@ h3 {
 .bojan-guy.is-active {
   opacity: 1;
   transform: scale(1);
+}
+.bojan-input-container {
+  width: 100%;
+  max-width: 260px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height 0.35s ease, opacity 0.3s ease, transform 0.3s ease, margin-top 0.3s ease;
+  margin-top: 0;
+}
+.bojan-input-container.is-open {
+  max-height: 140px;
+  opacity: 1;
+  transform: translateY(0);
+  margin-top: 14px;
+}
+.bojan-input-form {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 3px 6px 3px 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.bojan-input-form:focus-within {
+  border-color: #303134;
+  box-shadow: 0 0 0 2px rgba(48, 49, 52, 0.15);
+}
+.bojan-input-field {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  padding: 8px 0;
+  background: transparent;
+  color: #1f2328;
+}
+.bojan-submit-btn {
+  background: #303134;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.bojan-submit-btn:hover {
+  background: #1f2328;
+}
+.bojan-error-text {
+  font-size: 12px;
+  color: #d1242f;
+  margin-top: 6px;
+  text-align: center;
+}
+.bojan-inline-workers {
+  width: 100%;
+  margin-top: 16px;
+}
+.bojan-inline-title {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 8px;
+  text-align: center;
+  font-weight: 500;
 }
 .worker-picker-modal {
   padding: 4px 0 12px;

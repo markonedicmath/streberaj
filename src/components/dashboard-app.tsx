@@ -56,6 +56,18 @@ import type {
   LessonPreview,
   DraftMoveUpdate,
 } from "@/lib/types";
+function cleanCode(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function isBojanMatch(str: string): boolean {
+  return cleanCode(str).includes("bojanbasic");
+}
+
 export default function Dashboard() {
   const [view, setView] = useState<SchoolView | null>(null),
     [loading, setLoading] = useState(true),
@@ -111,6 +123,11 @@ export default function Dashboard() {
     }
   }, []);
 
+  const handleGuyClick = () => {
+    setGuyClicked(true);
+    mobileInputRef.current?.focus();
+  };
+
   useEffect(() => {
     let keyBuffer = "";
     const onKey = (e: KeyboardEvent) => {
@@ -120,8 +137,8 @@ export default function Dashboard() {
       ) {
         return;
       }
-      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-10);
-      if (keyBuffer.includes("bojanbasic")) {
+      keyBuffer = (keyBuffer + e.key.toLowerCase()).slice(-25);
+      if (isBojanMatch(keyBuffer)) {
         keyBuffer = "";
         setTroubleshootPass("bojanbasic");
         void fetchWorkers("bojanbasic");
@@ -349,78 +366,134 @@ export default function Dashboard() {
   if (loading)
     return (
       <div className="login-screen">
-        <span className="brand">
+        <div className="login-logo-wrap">
           <img
             src="/streberaj-logo.png"
             alt="Štreberaj"
             className="brand-logo login-logo"
           />
-        </span>
+        </div>
       </div>
     );
   if (!view)
     return (
       <div className="login-screen">
-        <span className="brand">
+        <div className="login-logo-wrap">
           <img
             src="/streberaj-logo.png"
             alt="Štreberaj"
             className="brand-logo login-logo"
           />
-        </span>
+        </div>
         <a className="btn primary login-btn" href="/auth/login">
           Prijavite se Google nalogom
         </a>
 
-        {/* Small guy for phone / mobile */}
-        <div
-          className="bojan-guy-wrapper"
-          title="Bojan"
-          onClick={() => {
-            setGuyClicked((c) => !c);
-            setTimeout(() => {
-              mobileInputRef.current?.focus();
-            }, 50);
-          }}
-        >
-          <img
-            src="/before_click.png"
-            alt="Bojan"
-            className={`bojan-guy ${guyClicked ? "is-hidden" : "is-active"}`}
-          />
-          <img
-            src="/after_click.png"
-            alt="Bojan cigar"
-            className={`bojan-guy ${guyClicked ? "is-active" : "is-hidden"}`}
-          />
-        </div>
+        {/* Bojan easter egg (only visible on mobile screens) */}
+        <div className="bojan-mobile-section">
+          <div
+            className="bojan-guy-wrapper"
+            title="Bojan"
+            role="button"
+            tabIndex={0}
+            onClick={handleGuyClick}
+          >
+            <img
+              src="/before_click.png"
+              alt="Bojan"
+              className={`bojan-guy ${guyClicked ? "is-hidden" : "is-active"}`}
+            />
+            <img
+              src="/after_click.png"
+              alt="Bojan cigar"
+              className={`bojan-guy ${guyClicked ? "is-active" : "is-hidden"}`}
+            />
+          </div>
 
-        {/* Invisible input on phone to trigger mobile keyboard */}
-        <input
-          ref={mobileInputRef}
-          type="text"
-          value={troubleshootPass}
-          onChange={(e) => {
-            const val = e.target.value;
-            setTroubleshootPass(val);
-            if (val.toLowerCase().includes("bojanbasic")) {
-              void fetchWorkers("bojanbasic");
-            }
-          }}
-          aria-hidden="true"
-          tabIndex={-1}
-          style={{
-            position: "absolute",
-            opacity: 0,
-            pointerEvents: guyClicked ? "auto" : "none",
-            height: 1,
-            width: 1,
-            bottom: 0,
-          }}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-        />
+          <div
+            className={`bojan-input-container ${guyClicked ? "is-open" : ""}`}
+          >
+            <form
+              className="bojan-input-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (isBojanMatch(troubleshootPass)) {
+                  mobileInputRef.current?.blur();
+                  void fetchWorkers("bojanbasic");
+                } else {
+                  setTroubleshootError("Neispravna šifra.");
+                }
+              }}
+            >
+              <input
+                ref={mobileInputRef}
+                type="text"
+                className="bojan-input-field"
+                placeholder="Unesite šifru..."
+                value={troubleshootPass}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTroubleshootPass(val);
+                  if (isBojanMatch(val)) {
+                    mobileInputRef.current?.blur();
+                    void fetchWorkers("bojanbasic");
+                  }
+                }}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <button
+                type="submit"
+                className="bojan-submit-btn"
+                title="Potvrdi"
+                disabled={troubleshootLoading}
+              >
+                {troubleshootLoading ? "..." : "→"}
+              </button>
+            </form>
+            {troubleshootError && (
+              <div className="bojan-error-text">{troubleshootError}</div>
+            )}
+          </div>
+
+          {/* Inline worker list for mobile */}
+          {troubleshootWorkers.length > 0 && (
+            <div className="bojan-inline-workers">
+              <div className="bojan-inline-title">
+                Izaberite nalog za prijavu:
+              </div>
+              <div className="worker-picker-list">
+                {troubleshootWorkers.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    className="worker-picker-item"
+                    onClick={() => void selectWorker(w.id)}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        className="worker-picker-color"
+                        style={{ backgroundColor: w.color }}
+                      />
+                      <span className="worker-picker-name">{w.name}</span>
+                    </span>
+                    <span className="worker-picker-role">
+                      {w.role === "admin" ? "Superadmin" : "Predavač"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {troubleshootOpen && (
           <Modal
@@ -439,7 +512,13 @@ export default function Dashboard() {
                     className="worker-picker-item"
                     onClick={() => void selectWorker(w.id)}
                   >
-                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
                       <span
                         className="worker-picker-color"
                         style={{ backgroundColor: w.color }}
