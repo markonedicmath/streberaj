@@ -1062,9 +1062,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="toolbar-center-group">
-                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                   <NewLessonButton onClick={() => newLesson()} />
-                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                 </div>
 
                 {/* View and teacher controls */}
@@ -1084,7 +1082,6 @@ export default function Dashboard() {
                 <div className="desktop-teacher-filters-left">
                   <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-desktop" />
                   <ScheduleSwitch checked={!teacher} onChange={all => setTeacher(all ? "" : view.actor.id)} label="Svi" description="Prikaži sve predavače" className="toolbar-svi-desktop" />
-                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                   <div className="teacher-filters">
                     {view.employees
                       .filter((e) => e.active && !isMarkoNedic(e))
@@ -1099,7 +1096,6 @@ export default function Dashboard() {
                         </button>
                       ))}
                   </div>
-                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                 </div>
                 <span className="desktop-today-schedule">{myTodaySummary}</span>
               </div>

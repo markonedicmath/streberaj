@@ -2042,15 +2042,6 @@ h3 {
   color: #1a73e8;
   background-color: #e8f0fe;
 }
-.desktop-toolbar-divider {
-  display: inline-block;
-  width: 1px;
-  height: 22px;
-  background-color: var(--line, #e2e8f0);
-  margin: 0 10px;
-  flex-shrink: 0;
-  align-self: center;
-}
 .desktop-current-time {
   display: inline-flex;
   align-items: center;
@@ -5702,7 +5693,6 @@ textarea {
   .toolbar-online-desktop,
   .toolbar-svi-desktop,
   .desktop-header-sheet,
-  .desktop-toolbar-divider,
   .desktop-current-time,
   .desktop-today-schedule,
   .desktop-teacher-filters,
@@ -5740,6 +5730,7 @@ textarea {
     padding: 10px 18px !important;
     gap: 12px !important;
     flex-wrap: nowrap !important;
+    border-bottom: 1px solid var(--line, #e2e8f0) !important;
   }
   .toolbar-left-group {
     display: flex !important;
