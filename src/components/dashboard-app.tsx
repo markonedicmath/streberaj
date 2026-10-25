@@ -119,7 +119,6 @@ export default function Dashboard() {
   const [troubleshootError, setTroubleshootError] = useState("");
   const [guyClicked, setGuyClicked] = useState(false);
   const mobileInputRef = useRef<HTMLInputElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const permissions = useQueuedToggle();
 
   const fetchWorkers = useCallback(async (code: string) => {
@@ -802,42 +801,59 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <nav>
-          {[
-            { label: "Raspored", icon: CalendarDays },
-            { label: "Učenici", icon: Users },
-            { label: "Obračun", icon: Wallet },
-            { label: "Poruke", icon: MessageCircle },
-            ...(view.actor.role === "admin"
-              ? [{ label: "Administracija", icon: SlidersHorizontal }]
-              : []),
-          ].map(({ label, icon: Icon }) => (
-            <button
-              className={tab === label ? "active" : ""}
-              key={label}
-              onClick={() => {
-                setTab(label);
-                setSearch("");
-              }}
-            >
-              <Icon size={18} />
-              <span className="nav-btn-label">
-                {label}
-                {label === "Poruke" && hasUnreadMessages && (
-                  <span className="nav-blip" aria-label="Nova poruka" />
-                )}
-              </span>
-            </button>
-          ))}
-        </nav>
+        <div className="header-nav-container">
+          <nav>
+            {[
+              { label: "Raspored", icon: CalendarDays },
+              { label: "Učenici", icon: Users },
+              { label: "Obračun", icon: Wallet },
+              { label: "Poruke", icon: MessageCircle },
+              ...(view.actor.role === "admin"
+                ? [{ label: "Administracija", icon: SlidersHorizontal }]
+                : []),
+            ].map(({ label, icon: Icon }) => (
+              <button
+                className={tab === label ? "active" : ""}
+                key={label}
+                onClick={() => {
+                  setTab(label);
+                  setSearch("");
+                }}
+              >
+                <Icon size={18} />
+                <span className="nav-btn-label">
+                  {label}
+                  {label === "Poruke" && hasUnreadMessages && (
+                    <span className="nav-blip" aria-label="Nova poruka" />
+                  )}
+                </span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </aside>
       <main className="main">
         {tab === "Raspored" ? (
           <div className={"schedule-layout " + (source ? "with-source" : "")}>
             <section className="schedule-card">
               <div className="schedule-toolbar">
-                {/* Left group: week navigation and online view switch. */}
+                {/* Left group: calendar icon, week navigation, day dropdown, online view switch. */}
                 <div className="toolbar-left-group">
+                  <button
+                    type="button"
+                    className="icon-btn toolbar-calendar-btn"
+                    aria-label="Tekuća nedelja"
+                    title="Idi na tekuću nedelju"
+                    onClick={() => {
+                      const today = belgradeToday();
+                      setWeek(weekStart(today));
+                      setFocusDate(today);
+                      setDay(null);
+                    }}
+                  >
+                    <CalendarDays size={18} />
+                  </button>
+
                   <div className="week-nav-compact">
                     <div className="compact-arrows-row">
                       <button
@@ -872,6 +888,34 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </div>
+
+                  <select
+                    aria-label="Prikaz dana"
+                    className="toolbar-day-select"
+                    value={day ?? "week"}
+                    onChange={(e) =>
+                      setDay(
+                        e.target.value === "week"
+                          ? null
+                          : Number(e.target.value),
+                      )
+                    }
+                  >
+                    <option value="week">Cela nedelja</option>
+                    {[
+                      "Ponedeljak",
+                      "Utorak",
+                      "Sreda",
+                      "Četvrtak",
+                      "Petak",
+                      "Subota",
+                      "Nedelja",
+                    ].map((name, i) => (
+                      <option key={name} value={i}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
 
                   <label className="toolbar-checkbox-label online-toggle">
                     <input
@@ -968,35 +1012,6 @@ export default function Dashboard() {
                       : "Danas"}
                   </button>
 
-                  {/* Calendar date picker icon */}
-                  <div className="toolbar-calendar-picker">
-                    <button
-                      type="button"
-                      className="icon-btn picker-trigger-btn"
-                      aria-label="Izaberi datum"
-                      onClick={() => {
-                        dateInputRef.current?.showPicker?.();
-                        dateInputRef.current?.focus();
-                      }}
-                    >
-                      <CalendarDays size={18} />
-                    </button>
-                    <input
-                      ref={dateInputRef}
-                      className="toolbar-native-date-input"
-                      type="date"
-                      value={focusDate || belgradeToday()}
-                      lang="sr-Latn"
-                      aria-label="Izaberi nedelju"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
-                        setWeek(weekStart(val));
-                        setDay(null);
-                        setFocusDate(val);
-                      }}
-                    />
-                  </div>
 
                   {/* Svi toggle: all teachers vs just logged-in user */}
                   <label className="toolbar-checkbox-label svi-toggle">
@@ -1080,32 +1095,7 @@ export default function Dashboard() {
                     <Redo2 size={18} />
                     <span>Ponovi</span>
                   </button>
-                  <select
-                    aria-label="Prikaz dana"
-                    value={day ?? "week"}
-                    onChange={(e) =>
-                      setDay(
-                        e.target.value === "week"
-                          ? null
-                          : Number(e.target.value),
-                      )
-                    }
-                  >
-                    <option value="week">Cela nedelja</option>
-                    {[
-                      "Ponedeljak",
-                      "Utorak",
-                      "Sreda",
-                      "Četvrtak",
-                      "Petak",
-                      "Subota",
-                      "Nedelja",
-                    ].map((n, i) => (
-                      <option value={i} key={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
+
                   <label
                     className="toggle-label"
                     title="Prikaži sive oznake punih sati unutar mreže"

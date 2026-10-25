@@ -83,7 +83,7 @@ export default function AccountSelect({
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflow: "hidden" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {items.find((e) => e.id === value) && (
             <span
               style={{
@@ -96,7 +96,7 @@ export default function AccountSelect({
               }}
             />
           )}
-          <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+          <span className="account-select-label-text">
             {items.find((employee) => employee.id === value)?.name ??
               "Izaberi nalog"}
           </span>
