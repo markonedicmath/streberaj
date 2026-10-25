@@ -435,15 +435,14 @@ export function LessonEditor({
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) &&
     Number.isFinite(Date.parse(date + "T12:00Z")) &&
     new Date(date + "T12:00Z").toISOString().slice(0, 10) === date;
-  const validStart = /^(0[6-9]|1\d|2[0-2]):(00|15|30|45)$/.test(start);
+  const validStart = /^(0?[6-9]|1\d|2[0-3]):[0-5]\d$/.test(start);
   const formIssue = !summaryName ? "Unesite ime učenika."
     : summaryName.length > 160 ? "Ime učenika može imati najviše 160 znakova."
     : !teacher?.active ? "Izaberite aktivnog predavača."
     : !validDate ? "Izaberite ispravan datum."
-    : !validStart ? "Unesite početak u koracima od 15 minuta, između 06:00 i 22:45."
+    : !validStart ? "Unesite početak između 06:00 i 23:59."
     : !parsedDuration || parsedDuration.units !== 1 || !allowedDuration(duration)
       ? "Izaberite trajanje: 45, 60, 90 ili 120 minuta."
-    : startMinute + duration > 1380 ? "Čas mora da se završi do 23:00."
     : displayedPrice !== null && (!Number.isFinite(displayedPrice) || displayedPrice < 0 || displayedPrice > 100_000_000)
       ? "Unesite ispravnu cenu časa."
     : displayedPercent !== null && (!Number.isFinite(displayedPercent) || displayedPercent < 0 || displayedPercent > 100)

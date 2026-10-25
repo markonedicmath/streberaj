@@ -303,8 +303,8 @@ export function reconcileSources(s: SchoolState, incoming: SourceBlock[]) {
       block.issue = block.issue ?? "Povežite izvornu boju sa predavačem.";
     if (!block.studentId)
       block.issue = block.issue ?? "Povežite izvorni zapis sa učenikom.";
-    if (block.start < 360 || block.start + block.duration > 1380)
-      block.issue = "Termin je izvan rasporeda 06:00–23:00.";
+    if (block.start < 360 || block.start >= 1440)
+      block.issue = "Termin je izvan rasporeda (pre 06:00 ili posle ponoći).";
     if (
       block.sourceCounter &&
       block.duration % block.sourceCounter.numbers.length !== 0

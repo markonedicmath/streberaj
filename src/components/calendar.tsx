@@ -627,7 +627,7 @@ export default function Calendar({
             desk: l.desk,
             mode: l.mode,
             duration:
-              snapDuration(l.duration + delta, END - l.start) ?? l.duration,
+              snapDuration(l.duration + delta, Math.max(120, END - l.start)) ?? l.duration,
           },
         };
       } else {
@@ -794,7 +794,7 @@ export default function Calendar({
             initial,
           unit = base.duration / base.units;
         const minutes =
-          snapDuration(unit + delta, (END - base.start) / base.units) ?? unit;
+          snapDuration(unit + delta, Math.max(120, END - base.start) / base.units) ?? unit;
         patch.duration = minutes * base.units;
       } else {
         const lane = document
@@ -815,7 +815,7 @@ export default function Calendar({
           mode: desk === null ? "online" : "in_person",
           start: Math.max(
             START,
-            Math.min(END - base.duration, Math.round(at / 15) * 15),
+            Math.min(END - 15, Math.round(at / 15) * 15),
           ),
         };
       }
@@ -940,9 +940,9 @@ export default function Calendar({
               mode: l.mode,
               start: e.shiftKey
                 ? l.start
-                : Math.max(START, Math.min(END - l.duration, l.start + d)),
+                : Math.max(START, Math.min(END - 15, l.start + d)),
               duration: e.shiftKey
-                ? stepDuration(l.duration, d, END - l.start)
+                ? stepDuration(l.duration, d, Math.max(120, END - l.start))
                 : l.duration,
             }).catch(() => {});
           }

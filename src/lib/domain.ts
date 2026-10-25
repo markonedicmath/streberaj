@@ -64,8 +64,8 @@ const lessonSchema = z
     shared: z.boolean(),
   })
   .refine(
-    (l) => l.start >= 360 && l.start + l.duration <= 1380,
-    "Čas mora biti između 06:00 i 23:00.",
+    (l) => l.start >= 360,
+    "Čas mora početi od 06:00.",
   )
   .refine(
     (l) => l.duration % l.units === 0,

@@ -10,11 +10,20 @@ export function normalizeRows(value: unknown) {
     : defaultRows();
 }
 export function position(minutes: number, rows: number[]) {
-  const offset = Math.max(0, Math.min(END - START, minutes - START)),
-    index = Math.floor(offset / 15);
+  const offset = Math.max(0, minutes - START),
+    index = Math.floor(offset / 15),
+    defaultHeight = rows[rows.length - 1] ?? 16;
+  if (index >= rows.length) {
+    const sum = rows.reduce((a, b) => a + b, 0);
+    return (
+      sum +
+      (index - rows.length) * defaultHeight +
+      ((defaultHeight * (offset % 15)) / 15)
+    );
+  }
   return (
     rows.slice(0, index).reduce((a, b) => a + b, 0) +
-    ((rows[index] ?? 0) * (offset % 15)) / 15
+    (((rows[index] ?? defaultHeight) * (offset % 15)) / 15)
   );
 }
 export function minuteAt(pixels: number, rows: number[]) {

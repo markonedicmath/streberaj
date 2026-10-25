@@ -118,7 +118,7 @@ export function LessonTimePicker({
   const trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
   const [rawHour, rawMinute] = value.split(":");
-  const hour = /^(0[6-9]|1[0-9]|2[0-2])$/.test(rawHour ?? "") ? rawHour : "08";
+  const hour = /^(0[6-9]|1[0-9]|2[0-3])$/.test(rawHour ?? "") ? rawHour : "08";
   const minute = ["00", "15", "30", "45"].includes(rawMinute)
     ? rawMinute
     : "00";
@@ -136,6 +136,9 @@ export function LessonTimePicker({
       ref={root}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        const v = (event.target as HTMLInputElement)?.value?.trim?.() ?? "";
+        const m = v.match(/^([6-9]):([0-5]\d)$/);
+        if (m) onChange(`0${m[1]}:${m[2]}`);
       }}
       onKeyDownCapture={(event) => {
         if (event.key === "Escape" && open) {
@@ -153,11 +156,11 @@ export function LessonTimePicker({
         required
         aria-label="Početak"
         placeholder="08:15"
-        pattern="(0[6-9]|1[0-9]|2[0-2]):(00|15|30|45)"
+        pattern="(0?[6-9]|1[0-9]|2[0-3]):[0-5][0-9]"
         maxLength={5}
         value={value}
-        title="Vreme od 06:00 do 22:45, u koracima od 15 minuta"
-        onChange={(event) => onChange(event.target.value)}
+        title="Vreme između 06:00 i 23:59"
+        onChange={(event) => onChange(event.target.value.replace(".", ":"))}
         onKeyDown={(event) => {
           if (event.key === "Enter" && onNext) {
             event.preventDefault();
@@ -175,7 +178,7 @@ export function LessonTimePicker({
                 Math.max(
                   360,
                   Math.min(
-                    1365,
+                    1425,
                     (Number.isFinite(current)
                       ? Math.round(current / 15) * 15
                       : 480) + (event.key === "ArrowUp" ? 15 : -15),
@@ -220,7 +223,7 @@ export function LessonTimePicker({
                 )
               }
             >
-              {Array.from({ length: 17 }, (_, index) =>
+              {Array.from({ length: 18 }, (_, index) =>
                 String(index + 6).padStart(2, "0"),
               ).map((h) => (
                 <option key={h} value={h}>

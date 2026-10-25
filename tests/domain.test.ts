@@ -422,8 +422,9 @@ test("autocomplete bira tačnog učenika čak i kada su imena jednaka", () => {
     "duplicate",
   );
 });
-test("nastava izvan prikazane satnice se odbija", () => {
+test("nastava pre 06:00 se odbija, a časovi posle 22:00 mogu trajati 90 min", () => {
   const s = setup();
   assert.throws(() => add(s, admin(s), { start: 345 }), /06:00/);
-  assert.throws(() => add(s, admin(s), { start: 1350, duration: 60 }), /23:00/);
+  assert.doesNotThrow(() => add(s, admin(s), { date: "2030-01-08", start: 1330, duration: 90 }));
+  assert.doesNotThrow(() => add(s, admin(s), { date: "2030-01-09", start: 1350, duration: 90 }));
 });
