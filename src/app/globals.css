@@ -2313,7 +2313,7 @@ h3 {
   line-height: 12px;
 }
 .short-lesson .lesson-teacher {
-  display: none;
+  display: flex;
 }
 .time-gutter > .quarter-hour {
   color: #61705a;
@@ -2466,9 +2466,11 @@ h3 {
   overflow: hidden;
   margin: 0;
 }
-.tiny-lesson .lesson-time,
-.tiny-lesson .lesson-teacher {
+.tiny-lesson .lesson-time {
   display: none;
+}
+.tiny-lesson .lesson-teacher {
+  display: flex;
 }
 .tiny-lesson .resize-handle {
   height: 4px;
@@ -3610,33 +3612,48 @@ body.calendar-grabbing * {
   line-height: 1.15;
 }
 .lesson-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-top: auto;
-  gap: 4px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin-top: auto !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
 }
-.lesson-footer .lesson-teacher {
-  margin-top: 0;
-  font-size: 10px;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.lesson-footer .lesson-teacher,
+.lesson-block .lesson-teacher {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  margin-top: 0 !important;
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  opacity: 1 !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
 }
 .lesson-footer .lesson-counter,
 .lesson-footer .lesson-counter .package-counter,
 .lesson-footer .lesson-counter .package-counter input,
 .lesson-block .lesson-counter,
-.lesson-block .lesson-counter .package-counter input {
+.lesson-block .lesson-counter .package-counter input,
+.lesson-counter .package-counter input,
+.very-short-lesson .lesson-counter,
+.very-short-lesson .lesson-counter input,
+.tiny-lesson .lesson-counter,
+.tiny-lesson .lesson-counter input {
+  display: inline-flex !important;
+  align-items: center !important;
   font-size: 10px !important;
-  line-height: 1.1;
-  font-weight: 700;
-}
-.lesson-block .lesson-teacher {
-  font-size: 10px;
-  line-height: 1.1;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+  height: auto !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
 }
 .lesson-block.compact-duration {
   padding: 2px 3px;
@@ -3646,12 +3663,8 @@ body.calendar-grabbing * {
   line-height: 1.05;
 }
 .lesson-block.very-short-lesson .lesson-time {
-  font-size: 10px;
-}
-.lesson-block.very-short-lesson .lesson-counter,
-.lesson-block.very-short-lesson .lesson-counter input {
-  font-size: 9px !important;
-  line-height: 12px;
+  font-size: 9px;
+  line-height: 10px;
 }
 .lesson-block.very-short-lesson .lesson-minutes {
   display: inline;
@@ -3659,38 +3672,12 @@ body.calendar-grabbing * {
 .lesson-block.tiny-lesson .lesson-time {
   display: none;
 }
-.lesson-block.tiny-lesson .lesson-counter,
-.lesson-block.tiny-lesson .lesson-counter input {
-  font-size: 9px !important;
-  line-height: 11px;
-}
-.lesson-counter .package-counter input {
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 16px;
-}
 .lesson-block .lesson-time,
 .lesson-block .lesson-teacher {
   opacity: 1;
 }
 .short-lesson .lesson-title strong {
   line-height: 12px;
-}
-.very-short-lesson .lesson-counter {
-  font-size: 11px !important;
-  line-height: 12px;
-}
-.very-short-lesson .lesson-counter input {
-  font-size: 12px;
-  line-height: 12px;
-}
-.tiny-lesson .lesson-counter {
-  font-size: 10px !important;
-  line-height: 11px;
-}
-.tiny-lesson .lesson-counter input {
-  font-size: 11px;
-  line-height: 11px;
 }
 .lesson-block .resize-handle {
   right: 6px;

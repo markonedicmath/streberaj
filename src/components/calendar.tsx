@@ -875,7 +875,7 @@ export default function Calendar({
         style={
           {
             "--lesson-time-size": `${l.duration <= 45 ? 11 : Math.min(14, Math.max(10.5, h / 6))}px`,
-            "--lesson-counter-size": `${l.duration <= 45 ? 16 : Math.min(24, Math.max(21, h / 4))}px`,
+            "--lesson-counter-size": "10px",
             top: position(l.start, rows),
             height: h,
             background: employee.color,
