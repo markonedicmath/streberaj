@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Users,
@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Plus,
   Sheet,
+  Table,
   X,
   Undo2,
   Redo2,
@@ -81,6 +82,44 @@ async function parseResponse<T = any>(
   }
 }
 
+function getBelgradeDateTime(): string {
+  const parts = new Intl.DateTimeFormat("sr-RS", {
+    timeZone: "Europe/Belgrade",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    day: "2-digit",
+    month: "2-digit",
+  }).formatToParts(new Date());
+
+  let hour = "00",
+    minute = "00",
+    day = "01",
+    month = "01";
+  for (const part of parts) {
+    if (part.type === "hour") hour = part.value;
+    if (part.type === "minute") minute = part.value;
+    if (part.type === "day") day = part.value;
+    if (part.type === "month") month = part.value;
+  }
+  if (hour === "24") hour = "00";
+  return `${hour}:${minute} | ${day}/${month}`;
+}
+
+function formatHourMinute(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}.${m < 10 ? "0" + m : m}h`;
+}
+
+function formatLessonCount(count: number): string {
+  if (count % 10 === 1 && count % 100 !== 11) return `${count} čas`;
+  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) {
+    return `${count} časa`;
+  }
+  return `${count} časova`;
+}
+
 export default function Dashboard() {
   const [view, setView] = useState<SchoolView | null>(null),
     [loading, setLoading] = useState(true),
@@ -124,6 +163,48 @@ export default function Dashboard() {
   const weekPickerRoot = useRef<HTMLDivElement>(null);
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const permissions = useQueuedToggle();
+
+  const [currentTime, setCurrentTime] = useState(getBelgradeDateTime);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(getBelgradeDateTime());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayLessons = useMemo(() => {
+    if (!view) return [];
+    const targetId = teacher || view.actor.id;
+    const today = belgradeToday();
+    return (view.lessons || [])
+      .filter(
+        (l) =>
+          l.teacherId === targetId &&
+          l.date === today &&
+          !("deletedAt" in l && l.deletedAt) &&
+          !("status" in l && l.status === "cancelled"),
+      )
+      .sort((a, b) => a.start - b.start);
+  }, [view, teacher]);
+
+  const myTodaySummary = useMemo(() => {
+    if (!view) return "";
+    const targetEmployee =
+      teacher && teacher !== view.actor.id
+        ? view.employees.find((e) => e.id === teacher)
+        : null;
+    const prefix = targetEmployee
+      ? `${targetEmployee.name.split(" ")[0]} danas`
+      : "Moj današnji raspored";
+
+    if (todayLessons.length === 0) {
+      return `${prefix}: Nema časova danas`;
+    }
+    const countStr = formatLessonCount(todayLessons.length);
+    const times = todayLessons.map((l) => formatHourMinute(l.start)).join(", ");
+    return `${prefix}: ${countStr}: ${times}`;
+  }, [todayLessons, teacher, view]);
 
   useEffect(() => {
     if (!weekPickerOpen) return;
@@ -806,6 +887,19 @@ export default function Dashboard() {
               </div>
               <button
                 type="button"
+                className={`icon-btn header-sheet-button desktop-header-sheet ${source ? "active" : ""}`}
+                aria-label="Prikaži Google tabelu"
+                aria-pressed={source}
+                title="Prikaži Google tabelu"
+                onClick={() => {
+                  if (tab !== "Raspored") setTab("Raspored");
+                  setSource(!source);
+                }}
+              >
+                <Table size={18} />
+              </button>
+              <button
+                type="button"
                 className="icon-btn settings-button"
                 aria-label="Podešavanja"
                 title="Podešavanja"
@@ -867,7 +961,7 @@ export default function Dashboard() {
           <div className={"schedule-layout " + (source ? "with-source" : "")}>
             <section className="schedule-card">
               <div className="schedule-toolbar">
-                {/* Left group: calendar icon, week navigation, day dropdown, online view switch. */}
+                {/* Left group: calendar icon, week navigation, DayWeekToggle */}
                 <div className="toolbar-left-group">
                   <div className="toolbar-calendar-wrap">
                     <button
@@ -964,184 +1058,50 @@ export default function Dashboard() {
                       </button>
                   </div>
 
-                  <select
-                    aria-label="Prikaz dana"
-                    className="toolbar-day-select"
-                    value={day ?? "week"}
-                    onChange={(e) =>
-                      setDay(
-                        e.target.value === "week"
-                          ? null
-                          : Number(e.target.value),
-                      )
-                    }
-                  >
-                    <option value="week">Cela nedelja</option>
-                    {[
-                      "Ponedeljak",
-                      "Utorak",
-                      "Sreda",
-                      "Četvrtak",
-                      "Petak",
-                      "Subota",
-                      "Nedelja",
-                    ].map((name, i) => (
-                      <option key={name} value={i}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-desktop" />
+                  <DayWeekToggle className="desktop-view-toggle" dayView={day !== null} onChange={changeDayView} />
                 </div>
 
                 <div className="toolbar-center-group">
+                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                   <NewLessonButton onClick={() => newLesson()} />
+                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                 </div>
 
-                {/* View and teacher controls. */}
+                {/* View and teacher controls */}
                 <div className="toolbar-right-group">
-                  <DayWeekToggle className="desktop-view-toggle" dayView={day !== null} onChange={changeDayView} />
-                  {/* Danas / week toggle */}
-                  <button
-                    type="button"
-                    className="btn small toolbar-today-toggle"
-                    onClick={() => {
-                      const today = belgradeToday();
-                      const currentWeek = weekStart();
-                      const isViewingToday =
-                        day !== null && addDays(week, day) === today;
-                      if (isViewingToday) {
-                        setWeek(currentWeek);
-                        setDay(null);
-                        setFocusDate(today);
-                      } else {
-                        setWeek(currentWeek);
-                        setDay(
-                          Math.round(
-                            (Date.parse(today + "T12:00Z") -
-                              Date.parse(currentWeek + "T12:00Z")) /
-                              86400000,
-                          ),
-                        );
-                        setFocusDate(today);
-                      }
-                    }}
-                  >
-                    {day !== null && addDays(week, day) === belgradeToday()
-                      ? "week"
-                      : "Danas"}
-                  </button>
-
-
-                  {/* Svi toggle: all teachers vs just logged-in user */}
-                  <ScheduleSwitch checked={!teacher} onChange={all => setTeacher(all ? "" : view.actor.id)} label="Svi" description="Prikaži sve predavače" />
+                  {/* Svi toggle for mobile */}
+                  <ScheduleSwitch checked={!teacher} onChange={all => setTeacher(all ? "" : view.actor.id)} label="Svi" description="Prikaži sve predavače" className="toolbar-svi-mobile" />
+                  {/* online toggle for mobile */}
                   <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-mobile" />
 
-                  {/* Sheet / Google spreadsheet comparison toggle */}
-                  <button
-                    type="button"
-                    className={`icon-btn toolbar-sheet-btn ${source ? "active" : ""}`}
-                    aria-label="Prikaži Google tabelu"
-                    aria-pressed={source}
-                    onClick={() => setSource(!source)}
-                  >
-                    <Sheet size={18} />
-                  </button>
-                </div>
-
-                {/* Desktop-only extra controls */}
-                <div className="desktop-extra-controls">
-                  <button
-                    className="btn small undo-button desktop-undo"
-                    aria-label={
-                      view.undoLabel
-                        ? "Poništi: " + view.undoLabel
-                        : "Poništi poslednju izmenu"
-                    }
-                    title={
-                      view.undoLabel
-                        ? "Poništi: " + view.undoLabel + " (Ctrl + Z)"
-                        : "Nema izmene za poništavanje"
-                    }
-                    disabled={!view.undoLabel}
-                    onClick={async () => {
-                      try {
-                        await command("undo", {});
-                        closeLesson();
-                      } catch (e) {
-                        setNotice((e as Error).message);
-                      }
-                    }}
-                  >
-                    <Undo2 size={18} />
-                    <span>
-                      {view.undoLabel
-                        ? "Poništi: " + view.undoLabel
-                        : "Poništi"}
-                    </span>
-                  </button>
-                  <button
-                    className="btn small undo-button redo-button desktop-redo"
-                    aria-label={
-                      view.redoLabel ? "Ponovi: " + view.redoLabel : "Ponovi"
-                    }
-                    title={
-                      view.redoLabel
-                        ? "Ponovi: " + view.redoLabel + " (Ctrl + Shift + Z)"
-                        : "Nema radnje za ponavljanje"
-                    }
-                    disabled={!view.redoLabel}
-                    onClick={async () => {
-                      try {
-                        await command("redo", {});
-                        closeLesson();
-                      } catch (e) {
-                        setNotice((e as Error).message);
-                      }
-                    }}
-                  >
-                    <Redo2 size={18} />
-                    <span>Ponovi</span>
-                  </button>
-
-                  <label
-                    className="toggle-label"
-                    title="Prikaži sive oznake punih sati unutar mreže"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={hourGuides}
-                      onChange={(e) => setHourGuides(e.target.checked)}
-                    />
-                    Sati u mreži
-                  </label>
-                  <NewLessonButton onClick={() => newLesson()} className="desktop-new-lesson" />
+                  {/* Desktop current Belgrade time */}
+                  <span className="desktop-current-time">Trenutno vreme: {currentTime}</span>
                 </div>
               </div>
 
               {/* Teacher filters: visible on desktop, hidden on mobile */}
               <div className="calendar-filters desktop-teacher-filters">
-                <div className="teacher-filters">
-                  <button
-                    className={!teacher ? "selected" : ""}
-                    onClick={() => setTeacher("")}
-                  >
-                    Svi predavači
-                  </button>
-                  {view.employees
-                    .filter((e) => e.active)
-                    .map((e) => (
-                      <button
-                        className={teacher === e.id ? "selected" : ""}
-                        key={e.id}
-                        onClick={() => setTeacher(teacher === e.id ? "" : e.id)}
-                      >
-                        <i style={{ background: e.color }} />
-                        {e.name}
-                      </button>
-                    ))}
+                <div className="desktop-teacher-filters-left">
+                  <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-desktop" />
+                  <ScheduleSwitch checked={!teacher} onChange={all => setTeacher(all ? "" : view.actor.id)} label="Svi" description="Prikaži sve predavače" className="toolbar-svi-desktop" />
+                  <span className="desktop-toolbar-divider" aria-hidden="true" />
+                  <div className="teacher-filters">
+                    {view.employees
+                      .filter((e) => e.active)
+                      .map((e) => (
+                        <button
+                          className={teacher === e.id ? "selected" : ""}
+                          key={e.id}
+                          onClick={() => setTeacher(teacher === e.id ? "" : e.id)}
+                        >
+                          <i style={{ background: e.color }} />
+                          {e.name}
+                        </button>
+                      ))}
+                  </div>
+                  <span className="desktop-toolbar-divider" aria-hidden="true" />
                 </div>
+                <span className="desktop-today-schedule">{myTodaySummary}</span>
               </div>
               <Calendar
                 view={view}

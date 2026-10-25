@@ -2029,13 +2029,61 @@ h3 {
 .toolbar-sheet-btn.active {
   color: #3b82f6;
 }
-.desktop-extra-controls {
-  display: flex;
+.desktop-header-sheet {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  color: #5f6368;
+}
+.desktop-header-sheet:hover {
+  color: #202124;
+}
+.desktop-header-sheet.active {
+  color: #1a73e8;
+  background-color: #e8f0fe;
+}
+.desktop-toolbar-divider {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  background-color: var(--line, #e2e8f0);
+  margin: 0 10px;
+  flex-shrink: 0;
+  align-self: center;
+}
+.desktop-current-time {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  white-space: nowrap;
+}
+.desktop-today-schedule {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  white-space: nowrap;
 }
 .desktop-teacher-filters {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px 12px;
+  background: #fff;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+.desktop-teacher-filters-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
 }
 .schedule-layout.with-source {
   padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px));
@@ -5544,12 +5592,19 @@ textarea {
   .toolbar-calendar-btn svg { width: 17px; }
   .toolbar-day-select,
   .toolbar-online-desktop,
+  .toolbar-svi-desktop,
+  .desktop-header-sheet,
+  .desktop-toolbar-divider,
+  .desktop-current-time,
+  .desktop-today-schedule,
+  .desktop-teacher-filters,
   .desktop-view-toggle,
   .toolbar-today-toggle,
   .toolbar-sheet-btn { display: none !important; }
   .toolbar-center-group { display: flex !important; flex: 0 0 auto; margin: 0; }
   .toolbar-right-group { flex: 0 0 auto !important; gap: 7px !important; }
-  .schedule-switch.toolbar-online-mobile { display: inline-flex; }
+  .schedule-switch.toolbar-online-mobile,
+  .schedule-switch.toolbar-svi-mobile { display: inline-flex !important; }
   .schedule-switch { gap: 4px; min-height: 32px; font-size: 11px; }
   .schedule-switch-track { width: 32px; height: 21px; border-radius: 5px; }
   .schedule-switch-track::after { width: 17px; height: 17px; border-radius: 3px; }
@@ -5568,6 +5623,59 @@ textarea {
   .schedule-switch input:checked + .schedule-switch-track::after { transform: translateX(8px); }
   .schedule-toolbar .add-lesson-pill { padding-right: 7px; gap: 4px; font-size: 10px; }
 }
+
+@media (min-width: 769px) {
+  .schedule-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 18px !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+  }
+  .toolbar-left-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex: 1 1 0 !important;
+    justify-content: flex-start !important;
+    min-width: 0 !important;
+  }
+  .toolbar-center-group {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    gap: 8px !important;
+  }
+  .toolbar-right-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex: 1 1 0 !important;
+    justify-content: flex-end !important;
+    min-width: 0 !important;
+  }
+  .toolbar-svi-mobile,
+  .toolbar-online-mobile {
+    display: none !important;
+  }
+  .toolbar-svi-desktop,
+  .toolbar-online-desktop {
+    display: inline-flex !important;
+  }
+  .schedule-toolbar .add-lesson-pill {
+    transform: scale(1.05);
+    transform-origin: center;
+  }
+  .schedule-toolbar .add-lesson-pill:hover {
+    transform: scale(1.05);
+  }
+  .schedule-toolbar .add-lesson-pill:active {
+    transform: scale(1.01);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .day-week-slider,
   .schedule-switch-track,
@@ -5818,6 +5926,16 @@ select,
 .toolbar-online-mobile *,
 .toolbar-online-desktop,
 .toolbar-online-desktop *,
+.toolbar-svi-mobile,
+.toolbar-svi-mobile *,
+.toolbar-svi-desktop,
+.toolbar-svi-desktop *,
+.desktop-current-time,
+.desktop-current-time *,
+.desktop-today-schedule,
+.desktop-today-schedule *,
+.desktop-header-sheet,
+.desktop-header-sheet *,
 .toolbar-filter-btn,
 .teacher-filter-btn,
 .teacher-filters,
