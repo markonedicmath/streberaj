@@ -312,7 +312,10 @@ export default function Calendar({
     if (!editorDraft && editorDragging.current) cleanup.current();
   }, [!!editorDraft]);
   useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = position(480, rows) - 20;
+    if (scroll.current) {
+      scroll.current.scrollTop = position(480, rows) - 20;
+      setIsScrolled(scroll.current.scrollTop > 0);
+    }
     return () => cleanup.current();
   }, []);
   useEffect(() => {
@@ -1218,7 +1221,7 @@ export default function Calendar({
         aria-label="Nedeljni raspored"
         tabIndex={0}
         onScroll={(e) => {
-          setIsScrolled(e.currentTarget.scrollTop > 12);
+          setIsScrolled(e.currentTarget.scrollTop > 0);
         }}
       >
         <div

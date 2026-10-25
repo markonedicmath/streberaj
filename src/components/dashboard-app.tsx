@@ -22,6 +22,7 @@ import ActivityNotifications from "./activity-notifications";
 import ResetBoard from "./reset-board";
 import AccountSelect from "./account-select";
 import SettingsPanel from "./settings-panel";
+import { DayWeekToggle, ScheduleSwitch, NewLessonButton } from "./schedule-controls";
 import { useQueuedToggle } from "./use-queued-toggle";
 import { GoogleAutoSync } from "./google-connection";
 import PackageCounter from "./package-counter";
@@ -119,7 +120,20 @@ export default function Dashboard() {
   const [troubleshootError, setTroubleshootError] = useState("");
   const [guyClicked, setGuyClicked] = useState(false);
   const mobileInputRef = useRef<HTMLInputElement>(null);
+  const weekDateInput = useRef<HTMLInputElement>(null);
+  const weekPickerRoot = useRef<HTMLDivElement>(null);
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const permissions = useQueuedToggle();
+
+  useEffect(() => {
+    if (!weekPickerOpen) return;
+    weekDateInput.current?.focus();
+    const outside = (event: PointerEvent) => {
+      if (!weekPickerRoot.current?.contains(event.target as Node)) setWeekPickerOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [weekPickerOpen]);
 
   const fetchWorkers = useCallback(async (code: string) => {
     setTroubleshootLoading(true);
@@ -307,7 +321,7 @@ export default function Dashboard() {
       return;
     }
     if (!params.has("google")) return;
-    setTab("Administracija");
+    setTab("Admin");
     setNotice(
       params.get("google") === "connected"
         ? "Google nalog je povezan. Uvoz se pokreće automatski."
@@ -649,6 +663,14 @@ export default function Dashboard() {
       timeZone: "UTC",
     }).format(new Date(week + "T12:00Z")),
     student = view.students.find((s) => s.id === studentCard);
+  const changeDayView = (showDay: boolean) => {
+    if (!showDay) { setDay(null); return; }
+    const offset = Math.round((Date.parse(focusDate + "T12:00Z") - Date.parse(week + "T12:00Z")) / 86400000);
+    setDay(offset >= 0 && offset < 7 ? offset : (new Date(belgradeToday() + "T12:00Z").getUTCDay() + 6) % 7);
+  };
+  const openWeekPicker = () => {
+    setWeekPickerOpen(open => !open);
+  };
   return (
     <div className="app-shell">
       <GoogleAutoSync
@@ -712,6 +734,14 @@ export default function Dashboard() {
                 <Redo2 size={18} />
               </button>
             </div>
+            {tab === "Raspored" && (
+              <div className="mobile-schedule-tools">
+                <DayWeekToggle dayView={day !== null} onChange={changeDayView} />
+                <button type="button" className={`icon-btn header-sheet-button ${source ? "active" : ""}`} aria-label="Prikaži Google tabelu" aria-pressed={source} onClick={() => setSource(!source)}>
+                  <Sheet size={19} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="profile-group">
@@ -809,7 +839,7 @@ export default function Dashboard() {
               { label: "Obračun", icon: Wallet },
               { label: "Poruke", icon: MessageCircle },
               ...(view.actor.role === "admin"
-                ? [{ label: "Administracija", icon: SlidersHorizontal }]
+                ? [{ label: "Admin", icon: SlidersHorizontal }]
                 : []),
             ].map(({ label, icon: Icon }) => (
               <button
@@ -839,23 +869,75 @@ export default function Dashboard() {
               <div className="schedule-toolbar">
                 {/* Left group: calendar icon, week navigation, day dropdown, online view switch. */}
                 <div className="toolbar-left-group">
-                  <button
-                    type="button"
-                    className="icon-btn toolbar-calendar-btn"
-                    aria-label="Tekuća nedelja"
-                    title="Idi na tekuću nedelju"
-                    onClick={() => {
-                      const today = belgradeToday();
-                      setWeek(weekStart(today));
-                      setFocusDate(today);
-                      setDay(null);
-                    }}
-                  >
-                    <CalendarDays size={18} />
-                  </button>
+                  <div className="toolbar-calendar-wrap">
+                    <button
+                      type="button"
+                      className="icon-btn toolbar-calendar-btn"
+                      aria-label="Izaberi datum"
+                      title="Izaberi datum"
+                      tabIndex={-1}
+                    >
+                      <CalendarDays size={18} />
+                    </button>
+                    <input
+                      type="date"
+                      className="toolbar-native-calendar-input"
+                      aria-label="Izaberi datum iz kalendara"
+                      value={focusDate}
+                      onClick={(e) => {
+                        try {
+                          (e.currentTarget as HTMLInputElement).showPicker?.();
+                        } catch {}
+                      }}
+                      onChange={(event) => {
+                        const date = event.target.value;
+                        if (!date) return;
+                        const monday = weekStart(date);
+                        setWeek(monday);
+                        setFocusDate(date);
+                        if (day !== null) {
+                          setDay(
+                            Math.round(
+                              (Date.parse(date + "T12:00Z") - Date.parse(monday + "T12:00Z")) /
+                                86400000,
+                            ),
+                          );
+                        }
+                      }}
+                    />
+                  </div>
 
-                  <div className="week-nav-compact">
-                    <div className="compact-arrows-row">
+                  <div className="week-nav-compact" ref={weekPickerRoot} onKeyDown={event => {
+                    if (event.key === "Escape" && weekPickerOpen) { event.stopPropagation(); setWeekPickerOpen(false); }
+                  }}>
+                    <button
+                      type="button"
+                      className="week-range-label"
+                      aria-label="Izaberi nedelju"
+                      aria-expanded={weekPickerOpen}
+                      onClick={openWeekPicker}
+                    >
+                      <span className="desktop-month-only">{month}</span>
+                      <span>{dateLabel(week).replace(/\s/g, "")} – {dateLabel(addDays(week, 6)).replace(/\s/g, "")}</span>
+                    </button>
+                    {weekPickerOpen && <div className="week-picker-popover">
+                    <label htmlFor="schedule-week-date">Izaberi datum</label>
+                    <input id="schedule-week-date" ref={weekDateInput} type="date" className="week-date-input" aria-label="Datum rasporeda" value={focusDate}
+                      onChange={event => {
+                        const date = event.target.value;
+                        if (!date) return;
+                        const monday = weekStart(date);
+                        setWeek(monday); setFocusDate(date);
+                        if (day !== null) setDay(Math.round((Date.parse(date + "T12:00Z") - Date.parse(monday + "T12:00Z")) / 86400000));
+                        setWeekPickerOpen(false);
+                      }} />
+                    <button type="button" className="btn small" onClick={() => {
+                      const today = belgradeToday(), monday = weekStart(today);
+                      setWeek(monday); setFocusDate(today);
+                      if (day !== null) setDay(Math.round((Date.parse(today + "T12:00Z") - Date.parse(monday + "T12:00Z")) / 86400000));
+                      setWeekPickerOpen(false);
+                    }}>Danas</button>
+                    </div>}
                       <button
                         type="button"
                         className="icon-btn compact-nav-arrow"
@@ -880,13 +962,6 @@ export default function Dashboard() {
                       >
                         <ChevronRight size={16} />
                       </button>
-                    </div>
-                    <div className="week-range-label">
-                      <span className="desktop-month-only">{month}</span>
-                      <span>
-                        {dateLabel(week)} – {dateLabel(addDays(week, 6))}
-                      </span>
-                    </div>
                   </div>
 
                   <select
@@ -917,70 +992,16 @@ export default function Dashboard() {
                     ))}
                   </select>
 
-                  <label className="toolbar-checkbox-label online-toggle">
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      aria-label="Prikaži online časove"
-                      checked={online}
-                      onChange={(e) => setOnline(e.target.checked)}
-                    />
-                    <span className="online-switch-body" aria-hidden="true">
-                      <span className="online-switch-track" />
-                      <span className="online-switch-thumb">
-                        <span className="online-switch-dome" />
-                        <span className="online-switch-scoop" />
-                      </span>
-                    </span>
-                    <span className="online-switch-caption">online</span>
-                  </label>
+                  <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-desktop" />
                 </div>
 
-                {/* Center group: tactile add button. */}
                 <div className="toolbar-center-group">
-                  <button
-                    type="button"
-                    className="toolbar-add-btn"
-                    aria-label="Novi čas"
-                    title="Novi čas"
-                    onClick={(event) => {
-                      if (
-                        window.matchMedia("(max-width: 768px)").matches &&
-                        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                      ) {
-                        const button = event.currentTarget;
-                        button.getAnimations().forEach((animation) => animation.cancel());
-                        button.animate(
-                          [
-                            { transform: "translateY(1px) scale(.91)" },
-                            { transform: "translateY(-2px) scale(1.07)", offset: .42 },
-                            { transform: "translateY(0) scale(.98)", offset: .72 },
-                            { transform: "translateY(0) scale(1)" },
-                          ],
-                          { duration: 160, easing: "cubic-bezier(.2,.7,.3,1)" },
-                        );
-                        const symbol = button.querySelector(".toolbar-add-symbol");
-                        symbol?.getAnimations().forEach((animation) => animation.cancel());
-                        symbol?.animate(
-                          [
-                            { transform: "rotate(-8deg) scale(.88)" },
-                            { transform: "rotate(7deg) scale(1.06)", offset: .45 },
-                            { transform: "rotate(0deg) scale(1)" },
-                          ],
-                          { duration: 173, easing: "cubic-bezier(.2,.7,.3,1)" },
-                        );
-                      }
-                      newLesson();
-                    }}
-                  >
-                    <span className="toolbar-add-face" aria-hidden="true">
-                      <Plus className="toolbar-add-symbol" size={22} color="#fff" strokeWidth={2.5} />
-                    </span>
-                  </button>
+                  <NewLessonButton onClick={() => newLesson()} />
                 </div>
 
-                {/* Right group: Danas/week toggle, Calendar date picker, Svi toggle, Sheet toggle */}
+                {/* View and teacher controls. */}
                 <div className="toolbar-right-group">
+                  <DayWeekToggle className="desktop-view-toggle" dayView={day !== null} onChange={changeDayView} />
                   {/* Danas / week toggle */}
                   <button
                     type="button"
@@ -1014,20 +1035,8 @@ export default function Dashboard() {
 
 
                   {/* Svi toggle: all teachers vs just logged-in user */}
-                  <label className="toolbar-checkbox-label svi-toggle">
-                    <input
-                      type="checkbox"
-                      checked={!teacher}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setTeacher("");
-                        } else {
-                          setTeacher(view.actor.id);
-                        }
-                      }}
-                    />
-                    <span>Svi</span>
-                  </label>
+                  <ScheduleSwitch checked={!teacher} onChange={all => setTeacher(all ? "" : view.actor.id)} label="Svi" description="Prikaži sve predavače" />
+                  <ScheduleSwitch checked={online} onChange={setOnline} label="online" description="Prikaži online časove" className="toolbar-online-mobile" />
 
                   {/* Sheet / Google spreadsheet comparison toggle */}
                   <button
@@ -1107,13 +1116,7 @@ export default function Dashboard() {
                     />
                     Sati u mreži
                   </label>
-                  <button
-                    className="btn primary new-lesson-button desktop-new-lesson"
-                    onClick={() => newLesson()}
-                  >
-                    <Plus size={16} />
-                    Novi čas
-                  </button>
+                  <NewLessonButton onClick={() => newLesson()} className="desktop-new-lesson" />
                 </div>
               </div>
 
@@ -1378,7 +1381,7 @@ export default function Dashboard() {
               />
             )}
             {tab === "Poruke" && <StaffNotes view={view} command={command} />}
-            {tab === "Administracija" && view.actor.role === "admin" && (
+            {tab === "Admin" && view.actor.role === "admin" && (
               <>
                 <section className="content-card">
                   <div className="card-title">
