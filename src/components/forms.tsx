@@ -32,7 +32,7 @@ import {
   weekStart,
 } from "@/lib/time";
 import { previewConflicts, resolveDesk } from "@/lib/scheduling-preview";
-import { STAFF_COLORS, textForColor } from "@/lib/staff-colors";
+import { STAFF_COLORS, textForColor, isMarkoNedic } from "@/lib/staff-colors";
 export type Command = (
   type: string,
   payload: unknown,
@@ -346,12 +346,49 @@ export function LessonEditor({
     [manualPrice, setManualPrice] = useState(lesson?.priceManual ?? false),
     [manualPercent, setManualPercent] = useState(lesson?.bossManual ?? false),
     [shared, setShared] = useState(true);
+
+  const getNextCycleNumber = (st?: typeof selectedStudent) => {
+    if (!st) return "1";
+    const pSize = st.cycleSize ?? st.packageSize ?? 4;
+    if (st.cycle > 0 && st.cycle < pSize) {
+      return String(st.cycle + 1);
+    }
+    return "1";
+  };
+
+  const [isPackage, setIsPackage] = useState(() => {
+    return !!(
+      lesson?.counterOverride?.numbers?.length ||
+      (lesson?.cycleNumbers && lesson.cycleNumbers.length > 0)
+    );
+  });
+
+  const [packageNumber, setPackageNumber] = useState(() => {
+    if (lesson?.cycleNumbers?.[0]) return String(lesson.cycleNumbers[0]);
+    if (lesson?.counterOverride?.numbers?.[0]) return String(lesson.counterOverride.numbers[0]);
+    return "1";
+  });
+
+  const [packageSize, setPackageSize] = useState(() => {
+    if (lesson?.cycleSize) return String(lesson.cycleSize);
+    if (lesson?.counterOverride?.size) return String(lesson.counterOverride.size);
+    return "4";
+  });
   const today = belgradeToday(),
     currentWeek = weekStart(today),
     nextWeek = addDays(currentWeek, 7),
     hasNextWeekOptions = today > currentWeek,
     selectedNextWeek = date >= nextWeek && date < addDays(nextWeek, 7);
-  const selectedStudent = view.students.find((s) => s.id === studentId),
+  const selectedStudent = view.students.find((s) => s.id === studentId);
+
+  useEffect(() => {
+    if (!lesson && selectedStudent) {
+      setPackageNumber(getNextCycleNumber(selectedStudent));
+      setPackageSize(String(selectedStudent.cycleSize ?? selectedStudent.packageSize ?? 4));
+    }
+  }, [selectedStudent, lesson]);
+
+  const
     parsedDuration = parseDuration(durationInput),
     duration = parsedDuration?.duration ?? 0,
     teacher = view.employees.find((e) => e.id === teacherId),
@@ -579,6 +616,15 @@ export function LessonEditor({
             ? null
             : Math.round(Number(percent.replace(",", ".")) * 100),
         shared: mode === "online" ? true : false,
+        counterOverride: isPackage && parseInt(packageNumber, 10) >= 1 && parseInt(packageSize, 10) >= 1
+          ? {
+              numbers: [Math.min(parseInt(packageNumber, 10), parseInt(packageSize, 10))],
+              size: Math.max(1, parseInt(packageSize, 10)),
+              propagate: true,
+            }
+          : lesson?.counterOverride
+            ? null
+            : undefined,
       };
       const r = studentId
         ? await command("saveLesson", payload)
@@ -1052,7 +1098,7 @@ export function LessonEditor({
                   }
                 >
                   {view.employees
-                    .filter((e) => e.active)
+                    .filter((e) => e.active && (!isMarkoNedic(e) || e.id === teacherId))
                     .map((e) => (
                       <option value={e.id} key={e.id}>
                         {e.name}
@@ -1156,6 +1202,63 @@ export function LessonEditor({
                   </button>
                 )}
               </Field>
+              <div className="package-settings-box wide">
+                <label className="package-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={isPackage}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsPackage(checked);
+                      if (checked) {
+                        if (!packageNumber || packageNumber === "0") {
+                          setPackageNumber(getNextCycleNumber(selectedStudent));
+                        }
+                        if (!packageSize || packageSize === "0") {
+                          setPackageSize(String(lesson?.cycleSize ?? selectedStudent?.cycleSize ?? selectedStudent?.packageSize ?? 4));
+                        }
+                      }
+                    }}
+                  />
+                  <span className="package-toggle-text">
+                    <strong>Paket (kupovina u paketu)</strong>
+                    <small>Odredite redni broj časa i veličinu paketa</small>
+                  </span>
+                </label>
+                {isPackage && (
+                  <div className="package-inputs-row">
+                    <div className="package-input-col">
+                      <label htmlFor="package-lesson-number">Redni broj časa</label>
+                      <input
+                        id="package-lesson-number"
+                        type="number"
+                        min={1}
+                        max={Number(packageSize) || 200}
+                        value={packageNumber}
+                        onChange={(e) => setPackageNumber(e.target.value)}
+                        placeholder="1"
+                      />
+                    </div>
+                    <span className="package-separator" aria-hidden="true">/</span>
+                    <div className="package-input-col">
+                      <label htmlFor="package-total-size">Ukupno u paketu</label>
+                      <input
+                        id="package-total-size"
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={packageSize}
+                        onChange={(e) => setPackageSize(e.target.value)}
+                        placeholder="4"
+                      />
+                    </div>
+                    <div className="package-preview-pill">
+                      <span>Prikaz:</span>
+                      <strong>{packageNumber || "1"} / {packageSize || "4"}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             {teacherId !== view.actor.id && !lesson && (
               <p className="muted">
@@ -1546,7 +1649,7 @@ export function EmployeeEditor({
         role: "teacher",
         color:
           STAFF_COLORS.find(
-            (c) => !employees.some((e) => e.color === c.background),
+            (c) => !employees.some((e) => e.color === c.background && !isMarkoNedic(e)),
           )?.background ?? "",
         canSetPrice: true,
         canScheduleOthers: true,
@@ -1612,7 +1715,7 @@ export function EmployeeEditor({
             <div>
               {STAFF_COLORS.map((color) => {
                 const occupied = employees.find(
-                  (e) => e.id !== employee?.id && e.color === color.background,
+                  (e) => e.id !== employee?.id && e.color === color.background && !isMarkoNedic(e),
                 );
                 return (
                   <button

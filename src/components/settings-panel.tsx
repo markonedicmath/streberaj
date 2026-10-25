@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, LogOut } from "lucide-react";
 import type { SchoolView } from "@/lib/types";
-import { STAFF_COLORS, textForColor } from "@/lib/staff-colors";
+import { STAFF_COLORS, textForColor, isMarkoNedic } from "@/lib/staff-colors";
 import { ErrorMessage, Field, Modal, type Command } from "./forms";
 
 export default function SettingsPanel({
@@ -135,7 +135,8 @@ export default function SettingsPanel({
                   const occupied = view.employees.find(
                     (employee) =>
                       employee.id !== view.actor.id &&
-                      employee.color === color.background,
+                      employee.color === color.background &&
+                      !isMarkoNedic(employee),
                   );
                   return (
                     <button

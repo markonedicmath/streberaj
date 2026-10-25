@@ -27,7 +27,7 @@ import { DayWeekToggle, ScheduleSwitch, NewLessonButton } from "./schedule-contr
 import { useQueuedToggle } from "./use-queued-toggle";
 import { GoogleAutoSync } from "./google-connection";
 import PackageCounter from "./package-counter";
-import { textForColor } from "@/lib/staff-colors";
+import { textForColor, isMarkoNedic } from "@/lib/staff-colors";
 import { TARIFFS } from "@/lib/pricing";
 import {
   LessonEditor,
@@ -1087,7 +1087,7 @@ export default function Dashboard() {
                   <span className="desktop-toolbar-divider" aria-hidden="true" />
                   <div className="teacher-filters">
                     {view.employees
-                      .filter((e) => e.active)
+                      .filter((e) => e.active && !isMarkoNedic(e))
                       .map((e) => (
                         <button
                           className={teacher === e.id ? "selected" : ""}

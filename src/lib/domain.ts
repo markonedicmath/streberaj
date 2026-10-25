@@ -16,7 +16,7 @@ import {
   lessonOrder,
 } from "./lesson-counters";
 import { resolveDesk } from "./scheduling-preview";
-import { isStaffColor } from "./staff-colors";
+import { isStaffColor, isMarkoNedic } from "./staff-colors";
 import { applyDurationRounding } from "./duration-rounding";
 import {
   allowedDuration,
@@ -62,6 +62,14 @@ const lessonSchema = z
     university: z.boolean().optional(),
     referral: z.boolean().optional(),
     shared: z.boolean(),
+    counterOverride: z
+      .object({
+        numbers: z.array(z.number().int().min(1).max(200)),
+        size: z.number().int().min(1).max(200),
+        propagate: z.boolean().default(true),
+      })
+      .optional()
+      .nullable(),
   })
   .refine(
     (l) => l.start >= 360,
@@ -915,7 +923,14 @@ export function execute(
         old && old.duration === input.duration
           ? old.importedDuration
           : undefined,
+      counterOverride:
+        input.counterOverride !== undefined
+          ? (input.counterOverride ?? undefined)
+          : old?.counterOverride,
     };
+    if (input.counterOverride?.size) {
+      student.packageSize = input.counterOverride.size;
+    }
     demand(
       lesson.mode !== "in_person" || lesson.desk !== null,
       "Izaberite sto.",
@@ -1018,7 +1033,7 @@ export function execute(
     demand(employee && employee.active);
     demand(
       !s.employees.some(
-        (entry) => entry.id !== employee.id && entry.color === input.color,
+        (entry) => entry.id !== employee.id && entry.color === input.color && !isMarkoNedic(entry),
       ),
       "Tu boju već koristi drugi zaposleni.",
       409,
@@ -1055,7 +1070,7 @@ export function execute(
         (e) =>
           e.id !== old?.id &&
           ((!!input.email && e.email.toLowerCase() === input.email) ||
-            e.color.toLowerCase() === input.color),
+            (e.color.toLowerCase() === input.color && !isMarkoNedic(e))),
       ),
       "Imejl ili boja već pripada drugom zaposlenom.",
       409,
@@ -1715,7 +1730,7 @@ export function redoLast(s: SchoolState, actor: Employee) {
   Object.assign(s, next);
 }
 function validateEmployeeColors(employees: Employee[]) {
-  const colors = employees.map((e) => e.color.toLowerCase());
+  const colors = employees.filter((e) => !isMarkoNedic(e)).map((e) => e.color.toLowerCase());
   demand(
     colors.every(isStaffColor) && new Set(colors).size === colors.length,
     "Vraćanje boje nije moguće: boja je zauzeta ili nije u ponuđenoj paleti.",

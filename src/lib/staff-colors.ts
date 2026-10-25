@@ -46,6 +46,19 @@ export function textForColor(color: string) {
 }
 export const isStaffColor = (color: string) =>
   STAFF_COLORS.some((c) => c.background === color.toLowerCase());
+
+export function isMarkoNedic(employee?: { name?: string; email?: string } | null): boolean {
+  if (!employee) return false;
+  const name = (employee.name || "").toLowerCase().trim();
+  const email = (employee.email || "").toLowerCase().trim();
+  return (
+    name === "marko nedić" ||
+    name === "marko nedic" ||
+    email.includes("mnedictxt") ||
+    email.startsWith("marko.nedic")
+  );
+}
+
 export function normalizeStaffColors(employees: Employee[]) {
   const legacy: Record<string, string> = {
     "#0043ce": "#3563c1",
