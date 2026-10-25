@@ -1253,6 +1253,21 @@ export default function Dashboard() {
                     throw e;
                   }
                 }}
+                onChangeTeacher={async (lessonId, teacherId) => {
+                  const lesson = view.lessons.find((l) => l.id === lessonId);
+                  if (!lesson || "restricted" in lesson) return;
+                  try {
+                    await command("saveLesson", {
+                      ...lesson,
+                      teacherId,
+                    });
+                    setNotice("Predavač je promenjen.");
+                  } catch (e) {
+                    setNotice((e as Error).message);
+                    throw e;
+                  }
+                }}
+                onNotice={(msg) => setNotice(msg)}
               />
             </section>
             {source && (

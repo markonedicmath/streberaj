@@ -5553,3 +5553,203 @@ textarea {
 
 .login-error { width: min(360px, calc(100vw - 40px)); margin: 16px auto 0; padding: 12px 16px; border: 1px solid #ecc8c8; border-radius: 10px; background: #fff5f5; color: #8c2929; text-align: center; font-size: 14px; line-height: 1.5; }
 .login-error p { margin: 5px 0 0; }
+
+/* Prevent text selection when interacting with calendar fields / grid */
+.calendar-grid,
+.calendar-grid *,
+.schedule-table,
+.schedule-table *,
+.day-column,
+.day-column *,
+.day-body,
+.day-body *,
+.lane-desk,
+.lane-desk *,
+.lesson-block,
+.lesson-block *,
+.time-col,
+.time-col *,
+.time-cell,
+.time-cell * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* Allow text selection inside modals, inputs, textareas, quick-lesson */
+.modal,
+.modal *,
+.quick-lesson,
+.quick-lesson *,
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* Lesson PC Context Menu */
+.lesson-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  max-width: 260px;
+  background: #ffffff;
+  border: 1px solid #d5ddd1;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 5px 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1e2923;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: contextMenuFadeIn 0.1s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-header {
+  padding: 6px 12px 6px;
+  background: #f7f9f7;
+  border-bottom: 1px solid #eef2ee;
+}
+
+.context-menu-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #17251e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-time {
+  font-size: 11px;
+  color: #607267;
+  margin-top: 2px;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: #edf2ef;
+  margin: 4px 0;
+}
+
+.context-menu-item-group {
+  position: relative;
+}
+
+.context-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: #1e2923;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: #eef4f0;
+  outline: none;
+}
+
+.context-menu-item.has-submenu {
+  justify-content: space-between;
+}
+
+.context-menu-item.has-submenu .submenu-arrow {
+  margin-left: auto;
+  color: #8c9b93;
+}
+
+.context-menu-item.is-danger {
+  color: #cf3333;
+}
+
+.context-menu-item.is-danger:hover {
+  background: #fdf2f2;
+}
+
+.context-submenu {
+  position: absolute;
+  top: 0;
+  min-width: 180px;
+  max-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #d5ddd1;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 5px 0;
+  z-index: 10001;
+  animation: contextMenuFadeIn 0.1s ease-out;
+}
+
+.context-submenu.opens-right {
+  left: calc(100% - 4px);
+}
+
+.context-submenu.opens-left {
+  right: calc(100% - 4px);
+}
+
+.context-submenu.opens-up {
+  top: auto;
+  bottom: 0;
+}
+
+.context-menu-item.teacher-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+.teacher-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.teacher-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-check {
+  margin-left: auto;
+  color: #2e6945;
+  flex-shrink: 0;
+}
+
+.context-menu-item.teacher-item.is-current {
+  font-weight: 600;
+  background: #f4f8f5;
+}

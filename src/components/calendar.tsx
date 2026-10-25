@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { isDoubleTap, type Tap } from "@/lib/tap";
-import { Pencil, Check, X, MoveVertical, Trash2 } from "lucide-react";
+import { Pencil, Check, X, MoveVertical, Trash2, Copy, UserCheck, ChevronRight } from "lucide-react";
 import { textForColor as ink } from "@/lib/staff-colors";
 import PackageCounter from "./package-counter";
 import LessonTime from "./lesson-time";
@@ -84,6 +84,8 @@ interface Props {
     size: number,
     scope: CounterScope,
   ) => Promise<void>;
+  onChangeTeacher?: (lessonId: string, teacherId: string) => Promise<void>;
+  onNotice?: (message: string) => void;
 }
 export default function Calendar({
   view,
@@ -103,6 +105,8 @@ export default function Calendar({
   onMoveMany,
   onPackage,
   onCounter,
+  onChangeTeacher,
+  onNotice,
 }: Props) {
   const scroll = useRef<HTMLDivElement>(null),
     cleanup = useRef<() => void>(() => {}),
@@ -133,6 +137,102 @@ export default function Calendar({
     } | null>(null),
     [deleting, setDeleting] = useState(false),
     [isScrolled, setIsScrolled] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    lesson: Lesson;
+  } | null>(null);
+  const [teacherSubmenu, setTeacherSubmenu] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    function handlePointerDown(e: MouseEvent | TouchEvent) {
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as Node)
+      ) {
+        setContextMenu(null);
+        setTeacherSubmenu(false);
+      }
+    }
+    function handleScroll() {
+      setContextMenu(null);
+      setTeacherSubmenu(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setContextMenu(null);
+        setTeacherSubmenu(false);
+      }
+    }
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  const handleCopyText = async (l: Lesson) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    const student = view.students.find((s) => s.id === l.studentId);
+    const teacherObj = view.employees.find((e) => e.id === l.teacherId);
+    const studentName =
+      student?.name || ("studentName" in l ? (l as any).studentName : "") || "Čas";
+    const teacherName = teacherObj?.name || "";
+    const deskText =
+      l.mode === "online"
+        ? "Online"
+        : l.desk === 1
+          ? "Sto 1"
+          : l.desk === 2
+            ? "Sto 2"
+            : "Uživo";
+    const timeText = `${clock(l.start)}–${clock(l.start + l.duration)}`;
+    const text = `${studentName} · ${l.date} · ${timeText} · ${teacherName} · ${deskText}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      onNotice?.("Tekst časa je kopiran.");
+    } catch {
+      onNotice?.("Kopiranje nije uspelo.");
+    }
+  };
+
+  const handleEditLesson = (l: Lesson) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    onOpen(l);
+  };
+
+  const handleDeleteLesson = async (l: Lesson) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    await onDelete([l.id]);
+  };
+
+  const handleChangeTeacher = async (l: Lesson, teacherId: string) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    if (l.teacherId !== teacherId && onChangeTeacher) {
+      await onChangeTeacher(l.id, teacherId);
+    }
+  };
+
   const anchor = useRef<string | null>(null);
   const previousTap = useRef<Tap | null>(null),
     touchOrigin = useRef<Tap | null>(null);
@@ -886,6 +986,37 @@ export default function Calendar({
           } as React.CSSProperties
         }
         onPointerDown={(e) => !restricted && gesture(e, l)}
+        onDragStart={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          if (
+            typeof window !== "undefined" &&
+            window.matchMedia("(max-width: 768px)").matches
+          ) {
+            e.preventDefault();
+            return;
+          }
+          if (!restricted) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!selectedIds.has(l.id)) {
+              setSelectedIds(new Set([l.id]));
+            }
+            const menuWidth = 220;
+            const menuHeight = 240;
+            let x = e.clientX;
+            let y = e.clientY;
+            if (typeof window !== "undefined") {
+              if (x + menuWidth > window.innerWidth - 10) {
+                x = Math.max(10, window.innerWidth - menuWidth - 10);
+              }
+              if (y + menuHeight > window.innerHeight - 10) {
+                y = Math.max(10, window.innerHeight - menuHeight - 10);
+              }
+            }
+            setTeacherSubmenu(false);
+            setContextMenu({ x, y, lesson: l });
+          }
+        }}
         onTouchStart={(e) => {
           if (
             !restricted &&
@@ -1454,6 +1585,113 @@ export default function Calendar({
           ))}
         </div>
       </div>
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="lesson-context-menu"
+          style={{
+            top: contextMenu.y,
+            left: contextMenu.x,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-header">
+            <div className="context-menu-title">
+              {view.students.find((s) => s.id === contextMenu.lesson.studentId)
+                ?.name ||
+                ("studentName" in contextMenu.lesson &&
+                  (contextMenu.lesson as any).studentName) ||
+                "Čas"}
+            </div>
+            <div className="context-menu-time">
+              {clock(contextMenu.lesson.start)}–
+              {clock(contextMenu.lesson.start + contextMenu.lesson.duration)} ·{" "}
+              {view.employees.find((e) => e.id === contextMenu.lesson.teacherId)
+                ?.name || ""}
+            </div>
+          </div>
+          <div className="context-menu-separator" />
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => void handleCopyText(contextMenu.lesson)}
+          >
+            <Copy size={14} />
+            <span>Kopiraj tekst</span>
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => handleEditLesson(contextMenu.lesson)}
+          >
+            <Pencil size={14} />
+            <span>Izmeni</span>
+          </button>
+          <div
+            className={`context-menu-item-group ${teacherSubmenu ? "is-open" : ""}`}
+            onMouseEnter={() => setTeacherSubmenu(true)}
+            onMouseLeave={() => setTeacherSubmenu(false)}
+          >
+            <button
+              type="button"
+              className="context-menu-item has-submenu"
+              onClick={() => setTeacherSubmenu((v) => !v)}
+            >
+              <UserCheck size={14} />
+              <span>Promeni predavača</span>
+              <ChevronRight size={14} className="submenu-arrow" />
+            </button>
+            {teacherSubmenu && (
+              <div
+                className={`context-submenu ${
+                  typeof window !== "undefined" &&
+                  contextMenu.x + 400 > window.innerWidth
+                    ? "opens-left"
+                    : "opens-right"
+                } ${
+                  typeof window !== "undefined" &&
+                  contextMenu.y + 260 > window.innerHeight
+                    ? "opens-up"
+                    : ""
+                }`}
+              >
+                {view.employees
+                  .filter((e) => e.active)
+                  .map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      className={`context-menu-item teacher-item ${
+                        emp.id === contextMenu.lesson.teacherId ? "is-current" : ""
+                      }`}
+                      onClick={() =>
+                        void handleChangeTeacher(contextMenu.lesson, emp.id)
+                      }
+                    >
+                      <span
+                        className="teacher-dot"
+                        style={{ backgroundColor: emp.color }}
+                      />
+                      <span className="teacher-name">{emp.name}</span>
+                      {emp.id === contextMenu.lesson.teacherId && (
+                        <Check size={14} className="teacher-check" />
+                      )}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+          <div className="context-menu-separator" />
+          <button
+            type="button"
+            className="context-menu-item is-danger"
+            onClick={() => void handleDeleteLesson(contextMenu.lesson)}
+          >
+            <Trash2 size={14} />
+            <span>Obriši</span>
+          </button>
+        </div>
+      )}
     </>
   );
 }
