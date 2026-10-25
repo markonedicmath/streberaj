@@ -4080,6 +4080,19 @@ body.calendar-grabbing * {
   color: #0f172a;
   font-size: 13px;
 }
+.package-settings-box.package-settings-highlight {
+  border-color: #ec5938 !important;
+  background-color: #fff9f6 !important;
+  animation: packagePulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes packagePulse {
+  from {
+    box-shadow: 0 0 0 2px rgba(236, 89, 56, 0.25);
+  }
+  to {
+    box-shadow: 0 0 0 6px rgba(236, 89, 56, 0.5);
+  }
+}
 .duration-presets {
   min-width: 0;
   margin: 0;
@@ -5920,6 +5933,12 @@ select,
 
 .context-menu-item.is-danger:hover {
   background: #fdf2f2;
+}
+
+.context-menu-item.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .context-submenu {

@@ -2,7 +2,20 @@
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { isDoubleTap, type Tap } from "@/lib/tap";
-import { Pencil, Check, X, MoveVertical, Trash2, Copy, UserCheck, ChevronRight } from "lucide-react";
+import {
+  Pencil,
+  Check,
+  X,
+  MoveVertical,
+  Trash2,
+  Copy,
+  UserCheck,
+  ChevronRight,
+  Type,
+  Package,
+  ClipboardPaste,
+  Plus,
+} from "lucide-react";
 import { textForColor as ink } from "@/lib/staff-colors";
 import PackageCounter from "./package-counter";
 import LessonTime from "./lesson-time";
@@ -63,7 +76,7 @@ interface Props {
   focusDate?: string;
   editorDraft?: LessonPreview | null;
   onEditorMove?: (patch: DraftMove) => void;
-  onOpen: (l: Lesson) => void;
+  onOpen: (l: Lesson, focusSection?: "package") => void;
   onNew: (
     date: string,
     start: number,
@@ -86,6 +99,19 @@ interface Props {
   ) => Promise<void>;
   onChangeTeacher?: (lessonId: string, teacherId: string) => Promise<void>;
   onNotice?: (message: string) => void;
+  onPasteLesson?: (data: {
+    studentId: string;
+    teacherId: string;
+    date: string;
+    start: number;
+    duration: number;
+    desk: 1 | 2 | null;
+    mode: "in_person" | "online";
+    topic: string;
+    price: number | null;
+    bossBps: number | null;
+    shared: boolean;
+  }) => Promise<{ entityId?: string; warning?: string } | void>;
 }
 export default function Calendar({
   view,
@@ -107,6 +133,7 @@ export default function Calendar({
   onCounter,
   onChangeTeacher,
   onNotice,
+  onPasteLesson,
 }: Props) {
   const scroll = useRef<HTMLDivElement>(null),
     cleanup = useRef<() => void>(() => {}),
@@ -137,11 +164,27 @@ export default function Calendar({
     } | null>(null),
     [deleting, setDeleting] = useState(false),
     [isScrolled, setIsScrolled] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    lesson: Lesson;
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<
+    | { type: "lesson"; x: number; y: number; lesson: Lesson }
+    | {
+        type: "empty";
+        x: number;
+        y: number;
+        date: string;
+        desk: 1 | 2 | null;
+        start: number;
+      }
+    | null
+  >(null);
+  const [copiedLesson, setCopiedLesson] = useState<Lesson | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("streberaj-copied-lesson");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [teacherSubmenu, setTeacherSubmenu] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -175,6 +218,162 @@ export default function Calendar({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [contextMenu]);
+
+  const handleCopyLesson = (l: Lesson) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    setCopiedLesson(l);
+    try {
+      localStorage.setItem("streberaj-copied-lesson", JSON.stringify(l));
+    } catch {}
+    const student = view.students.find((s) => s.id === l.studentId);
+    const studentName =
+      student?.name || ("studentName" in l ? (l as any).studentName : "") || "Čas";
+    onNotice?.(`Kopiran je čas (${studentName}). Zalepite pomoću Ctrl + V ili desnim klikom.`);
+  };
+
+  const handlePromeniPaket = (l: Lesson) => {
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    onOpen(l, "package");
+  };
+
+  function findFirstAvailableSlot(
+    source: Lesson,
+    schoolView: SchoolView,
+    targetDate: string,
+  ): { date: string; start: number; desk: 1 | 2 | null } | null {
+    const duration = source.duration;
+    const mode = source.mode;
+    const preferredDesk = source.desk;
+    const teacherId = source.teacherId;
+    const studentId = source.studentId;
+
+    let candidate =
+      targetDate === source.date
+        ? source.start + source.duration
+        : Math.max(8 * 60, source.start);
+
+    if (candidate % 15 !== 0) {
+      candidate = Math.ceil(candidate / 15) * 15;
+    }
+
+    const maxEnd = 23 * 60; // 23:00
+
+    const dayLessons = schoolView.lessons.filter(
+      (l) => l.date === targetDate && ("restricted" in l || l.status !== "cancelled"),
+    );
+
+    while (candidate + duration <= maxEnd) {
+      const candidateEnd = candidate + duration;
+
+      const teacherBusy = dayLessons.some(
+        (l) =>
+          l.teacherId === teacherId &&
+          l.start < candidateEnd &&
+          l.start + l.duration > candidate,
+      );
+
+      const studentBusy = studentId
+        ? dayLessons.some(
+            (l) =>
+              !("restricted" in l) &&
+              l.studentId === studentId &&
+              l.start < candidateEnd &&
+              l.start + l.duration > candidate,
+          )
+        : false;
+
+      if (!teacherBusy && !studentBusy) {
+        if (mode === "online") {
+          return { date: targetDate, start: candidate, desk: null };
+        }
+
+        const preferredOccupied = dayLessons.some(
+          (l) =>
+            l.mode === "in_person" &&
+            l.desk === preferredDesk &&
+            l.start < candidateEnd &&
+            l.start + l.duration > candidate,
+        );
+
+        if (!preferredOccupied) {
+          return { date: targetDate, start: candidate, desk: preferredDesk };
+        }
+
+        const altDesk: 1 | 2 = preferredDesk === 1 ? 2 : 1;
+        const altOccupied = dayLessons.some(
+          (l) =>
+            l.mode === "in_person" &&
+            l.desk === altDesk &&
+            l.start < candidateEnd &&
+            l.start + l.duration > candidate,
+        );
+
+        if (!altOccupied) {
+          return { date: targetDate, start: candidate, desk: altDesk };
+        }
+      }
+
+      candidate += 15;
+    }
+
+    return null;
+  }
+
+  const handlePasteAtSlot = async (
+    date: string,
+    start: number,
+    desk: 1 | 2 | null,
+  ) => {
+    if (!copiedLesson || !onPasteLesson) return;
+    setContextMenu(null);
+    setTeacherSubmenu(false);
+    try {
+      const res = await onPasteLesson({
+        studentId: copiedLesson.studentId,
+        teacherId: copiedLesson.teacherId,
+        date,
+        start,
+        duration: copiedLesson.duration,
+        desk,
+        mode: desk === null ? "online" : copiedLesson.mode,
+        topic: copiedLesson.topic ?? "",
+        price: copiedLesson.price ?? null,
+        bossBps: copiedLesson.bossBps ?? null,
+        shared: copiedLesson.shared ?? false,
+      });
+      const student = view.students.find((s) => s.id === copiedLesson.studentId);
+      const studentName =
+        student?.name ||
+        ("studentName" in copiedLesson ? (copiedLesson as any).studentName : "") ||
+        "Čas";
+      if (res && typeof res === "object" && "entityId" in res && res.entityId) {
+        setSelectedIds(new Set([res.entityId]));
+      }
+      onNotice?.(`Čas (${studentName}) je uspešno nalepljen u ${clock(start)}.`);
+    } catch (err) {
+      onNotice?.((err as Error).message || "Lepljenje časa nije uspelo.");
+    }
+  };
+
+  const handlePasteAtFirstAvailable = async () => {
+    if (!copiedLesson) {
+      onNotice?.("Nema kopiranog časa za lepljenje. Prvo kopirajte čas pomoću Ctrl + C ili desnog klika.");
+      return;
+    }
+    const targetDate = focusDate || copiedLesson.date;
+    const slot = findFirstAvailableSlot(copiedLesson, view, targetDate);
+    if (!slot) {
+      onNotice?.(
+        `Nema slobodnog termina za lepljenje posle ${clock(
+          copiedLesson.start + copiedLesson.duration,
+        )} na datum ${targetDate}.`,
+      );
+      return;
+    }
+    await handlePasteAtSlot(slot.date, slot.start, slot.desk);
+  };
 
   const handleCopyText = async (l: Lesson) => {
     setContextMenu(null);
@@ -536,6 +735,24 @@ export default function Calendar({
         e.preventDefault();
         void removeSelected();
         return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C")) {
+        if (selectedIds.size > 0) {
+          const id = [...selectedIds].at(-1);
+          const l = view.lessons.find((item) => item.id === id);
+          if (l && !("restricted" in l)) {
+            e.preventDefault();
+            handleCopyLesson(l);
+            return;
+          }
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "v" || e.key === "V")) {
+        if (copiedLesson) {
+          e.preventDefault();
+          void handlePasteAtFirstAvailable();
+          return;
+        }
       }
       if (
         !e.altKey &&
@@ -1005,7 +1222,7 @@ export default function Calendar({
               setSelectedIds(new Set([l.id]));
             }
             const menuWidth = 220;
-            const menuHeight = 240;
+            const menuHeight = 280;
             let x = e.clientX;
             let y = e.clientY;
             if (typeof window !== "undefined") {
@@ -1017,7 +1234,7 @@ export default function Calendar({
               }
             }
             setTeacherSubmenu(false);
-            setContextMenu({ x, y, lesson: l });
+            setContextMenu({ type: "lesson", x, y, lesson: l });
           }
         }}
         onTouchStart={(e) => {
@@ -1409,6 +1626,40 @@ export default function Calendar({
                           e.currentTarget.getBoundingClientRect().top,
                         );
                       }}
+                      onContextMenu={(e) => {
+                        if (
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(max-width: 768px)").matches
+                        ) {
+                          return;
+                        }
+                        const isLesson = (e.target as HTMLElement)?.closest(".lesson-block");
+                        if (isLesson) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const top = e.currentTarget.getBoundingClientRect().top;
+                        const at = minuteAt(e.clientY - top, rows);
+                        const start = Math.min(END - 45, Math.max(START, Math.floor(at / 15) * 15));
+                        let x = e.clientX, y = e.clientY;
+                        const menuWidth = 220, menuHeight = 160;
+                        if (typeof window !== "undefined") {
+                          if (x + menuWidth > window.innerWidth - 10) {
+                            x = Math.max(10, window.innerWidth - menuWidth - 10);
+                          }
+                          if (y + menuHeight > window.innerHeight - 10) {
+                            y = Math.max(10, window.innerHeight - menuHeight - 10);
+                          }
+                        }
+                        setTeacherSubmenu(false);
+                        setContextMenu({
+                          type: "empty",
+                          x,
+                          y,
+                          date,
+                          desk,
+                          start,
+                        });
+                      }}
                     >
                       {list.map((l) => {
                         const overlaps = list.filter(
@@ -1588,7 +1839,7 @@ export default function Calendar({
           ))}
         </div>
       </div>
-      {contextMenu && (
+      {contextMenu && contextMenu.type === "lesson" && (
         <div
           ref={contextMenuRef}
           className="lesson-context-menu"
@@ -1619,8 +1870,16 @@ export default function Calendar({
             className="context-menu-item"
             onClick={() => void handleCopyText(contextMenu.lesson)}
           >
-            <Copy size={14} />
+            <Type size={14} />
             <span>Kopiraj tekst</span>
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => handleCopyLesson(contextMenu.lesson)}
+          >
+            <Copy size={14} />
+            <span>Kopiraj</span>
           </button>
           <button
             type="button"
@@ -1629,6 +1888,14 @@ export default function Calendar({
           >
             <Pencil size={14} />
             <span>Izmeni</span>
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => handlePromeniPaket(contextMenu.lesson)}
+          >
+            <Package size={14} />
+            <span>Promeni paket</span>
           </button>
           <div
             className={`context-menu-item-group ${teacherSubmenu ? "is-open" : ""}`}
@@ -1692,6 +1959,67 @@ export default function Calendar({
           >
             <Trash2 size={14} />
             <span>Obriši</span>
+          </button>
+        </div>
+      )}
+
+      {contextMenu && contextMenu.type === "empty" && (
+        <div
+          ref={contextMenuRef}
+          className="lesson-context-menu"
+          style={{
+            top: contextMenu.y,
+            left: contextMenu.x,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-header">
+            <div className="context-menu-title">Slobodan termin</div>
+            <div className="context-menu-time">
+              {contextMenu.date} · {clock(contextMenu.start)} ·{" "}
+              {contextMenu.desk === null ? "Online" : "Sto " + contextMenu.desk}
+            </div>
+          </div>
+          <div className="context-menu-separator" />
+          {copiedLesson ? (
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={() =>
+                void handlePasteAtSlot(
+                  contextMenu.date,
+                  contextMenu.start,
+                  contextMenu.desk,
+                )
+              }
+            >
+              <ClipboardPaste size={14} />
+              <span>
+                Zalepi (
+                {view.students.find((s) => s.id === copiedLesson.studentId)?.name ||
+                  ("studentName" in copiedLesson
+                    ? (copiedLesson as any).studentName
+                    : "") ||
+                  "čas"}
+                )
+              </span>
+            </button>
+          ) : (
+            <div className="context-menu-item is-disabled">
+              <ClipboardPaste size={14} />
+              <span>Zalepi (nema kopiranog časa)</span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => {
+              setContextMenu(null);
+              onNew(contextMenu.date, contextMenu.start, contextMenu.desk);
+            }}
+          >
+            <Plus size={14} />
+            <span>Novi čas ovde</span>
           </button>
         </div>
       )}

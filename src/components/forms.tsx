@@ -264,6 +264,7 @@ export function LessonEditor({
   onSaved,
   onPreview,
   externalMove,
+  initialFocus,
 }: {
   view: SchoolView;
   lesson?: Lesson;
@@ -273,6 +274,7 @@ export function LessonEditor({
   onSaved: (id: string) => void;
   onPreview?: (draft: LessonPreview | null) => void;
   externalMove?: DraftMoveUpdate | null;
+  initialFocus?: "package" | null;
 }) {
   const [section, setSection] = useState("Čas"),
     [error, setError] = useState(""),
@@ -387,6 +389,52 @@ export function LessonEditor({
       setPackageSize(String(selectedStudent.cycleSize ?? selectedStudent.packageSize ?? 4));
     }
   }, [selectedStudent, lesson]);
+
+  const moreSettingsRef = useRef<HTMLDetailsElement>(null);
+  const packageBoxRef = useRef<HTMLDivElement>(null);
+  const [highlightPackage, setHighlightPackage] = useState(false);
+
+  useEffect(() => {
+    if (initialFocus === "package") {
+      if (moreSettingsRef.current) {
+        moreSettingsRef.current.open = true;
+      }
+      setIsPackage(true);
+      if (!packageNumber || packageNumber === "0") {
+        setPackageNumber(getNextCycleNumber(selectedStudent));
+      }
+      if (!packageSize || packageSize === "0") {
+        setPackageSize(
+          String(
+            lesson?.cycleSize ??
+              selectedStudent?.cycleSize ??
+              selectedStudent?.packageSize ??
+              4,
+          ),
+        );
+      }
+      setHighlightPackage(true);
+      const timer1 = setTimeout(() => {
+        packageBoxRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        const input =
+          packageBoxRef.current?.querySelector<HTMLInputElement>(
+            "input[type=number]",
+          );
+        input?.focus();
+        input?.select();
+      }, 150);
+      const timer2 = setTimeout(() => {
+        setHighlightPackage(false);
+      }, 3500);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, [initialFocus, selectedStudent, lesson]);
 
   const
     parsedDuration = parseDuration(durationInput),
@@ -1082,7 +1130,7 @@ export function LessonEditor({
               </span>
             </label>
           </div>
-          <details className="more-settings">
+          <details className="more-settings" ref={moreSettingsRef}>
             <summary>
               <span>Više podešavanja</span>
               <ChevronDown size={17} />
@@ -1202,7 +1250,7 @@ export function LessonEditor({
                   </button>
                 )}
               </Field>
-              <div className="package-settings-box wide">
+              <div className={`package-settings-box wide ${highlightPackage ? "package-settings-highlight" : ""}`} ref={packageBoxRef}>
                 <label className="package-toggle-label">
                   <input
                     type="checkbox"

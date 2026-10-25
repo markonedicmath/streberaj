@@ -141,6 +141,7 @@ export default function Dashboard() {
     [source, setSource] = useState(false),
     [focusDate, setFocusDate] = useState(() => belgradeToday()),
     [lessonId, setLessonId] = useState<string | null>(null),
+    [lessonInitialFocus, setLessonInitialFocus] = useState<"package" | null>(null),
     [slot, setSlot] = useState<NewLesson | null>(null),
     [lessonPreview, setLessonPreview] = useState<LessonPreview | null>(null),
     [draftMove, setDraftMove] = useState<DraftMoveUpdate | null>(null),
@@ -509,6 +510,7 @@ export default function Dashboard() {
   }
   const closeLesson = useCallback(() => {
     setLessonId(null);
+    setLessonInitialFocus(null);
     setSlot(null);
     setLessonPreview(null);
     setDraftMove(null);
@@ -1117,7 +1119,7 @@ export default function Dashboard() {
                     patch,
                   }));
                 }}
-                onOpen={(l) => {
+                onOpen={(l, initialFocus) => {
                   setDraftMove(null);
                   previewLesson({
                     ...l,
@@ -1128,6 +1130,7 @@ export default function Dashboard() {
                   });
                   setSlot(null);
                   setLessonId(l.id);
+                  setLessonInitialFocus(initialFocus ?? null);
                 }}
                 onNew={newLesson}
                 onQuickAdd={quickAdd}
@@ -1227,6 +1230,13 @@ export default function Dashboard() {
                   }
                 }}
                 onNotice={(msg) => setNotice(msg)}
+                onPasteLesson={async (lessonData) => {
+                  return await command("saveLesson", {
+                    ...lessonData,
+                    status: "scheduled",
+                    units: 1,
+                  });
+                }}
               />
             </section>
             {source && (
@@ -1522,6 +1532,7 @@ export default function Dashboard() {
           onPreview={previewLesson}
           externalMove={draftMove}
           onSaved={closeLesson}
+          initialFocus={lessonInitialFocus}
         />
       )}
       {studentEdit && (
