@@ -84,11 +84,15 @@ npm ci
 npm run deploy
 ```
 
-Produkcijski build koristi OpenNext i webpack. Windows može zahtevati WSL ukoliko OpenNext prijavi grešku platforme. Ne pokretati razvojni server nad istim `.next` direktorijumom tokom builda.
+Produkcija koristi statički Next.js interfejs i mali izvorni Worker (`worker/index.ts`), bez Next.js/OpenNext servera na svakom zahtevu. `build:cloudflare` gradi interfejs webpack-om u `.next-native-ui`, kopira javne datoteke u `.worker/assets` i gradi API pomoću esbuild-a. Razvojni `.next` direktorijum ostaje odvojen. `wrangler deploy` samostalno obnavlja samo API; posle izmena interfejsa koristiti `npm run deploy`. Stara OpenNext konfiguracija nalazi se u `deployment/open-next.legacy.ts` samo kao referenca.
 
 Jednokratni prenos lokalne baze: `node --env-file=.env.local scripts/cloudflare-prepare.mjs` pravi konzistentnu rezervnu kopiju i privatne datoteke u ignorisanom `.data` direktorijumu. `cloudflare-seed.sql` namenjen je isključivo novoj praznoj D1 bazi, posle primene migracija; postojeća produkcijska revizija se ne prepisuje. Prenos čuva identifikatore, uplate, predaje, istoriju, brojače i šifrovanu Google vezu. Sačuvati isti ključ za šifrovanje. Priprema dodaje odobrenog administratora Marko Nedić (`markonedicmath@gmail.com`); stvarne adrese zaposlenih dodaju se kroz administraciju. Priprema nije deo redovnog deploy-a.
 
-D1 čuva stanje u delovima, sa atomskom proverom revizije, radi zaštite istovremenih izmena. Prazna ili nepotpuna revizija ne zamenjuje postojeće podatke. Sinhronizacija čita samo nedeljne kartice, u grupama od četiri, opseg `A1:O110` prema postojećem šablonu; time se izbegava preuzimanje hiljada praznih formatiranih redova. Ako se šablon proširi izvan tog opsega, prilagoditi uvoz.
+D1 čuva pojedinačne entitete u `school_records`; menjaju se samo izmenjeni zapisi. Atomska provera revizije i jedinstvenog tokena upisa sprečava izgubljene istovremene izmene. Istorija, poništavanja, uplate i predaje ostaju sačuvani. Čitanje rasporeda ne učitava rezervnu kopiju celog rasporeda ni stare idempotentne zahteve. Google prijava učitava samo zaposlene. Izmena i priprema osveženog prikaza imaju odvojene zahteve i CPU budžete.
+
+Sinhronizacija čita sve nedeljne kartice, najviše tri istovremeno, opseg `A1:O110` prema postojećem šablonu. Otisak sadržaja i veza čuva se u `school_import_cache`, pa neizmenjena nedelja ne pokreće ponovno usaglašavanje evidencije. Svaka nedelja ima poseban zahtev; nedostajuće rezervacije drugih nedelja se ne menjaju. Lokalne izmene, uplate i materijali ne prepisuju se uvozom. Ako se šablon proširi izvan tog opsega, prilagoditi uvoz.
+
+Migracije primeniti pre objavljivanja promena baze: `npx wrangler d1 migrations apply streberaj-db --remote`. Prelazak postojeće produkcije sa delova snimka na pojedinačne zapise već je završen 25.10.2026, uz rezervnu kopiju i poređenje svih entiteta. `scripts/migrate-native.mjs` je jednokratni postupak i odbija već pripremljenu bazu. Stare tabele ostaju rezervna kopija, a okidač `school_legacy_frozen` blokira stare upise: ne vraćati stari Worker bez zasebne, proverene migracije. Ne pokretati seed nad postojećom produkcijom. Lokalni probni prečac za naloge nije podržan na objavljenom API-ju; koristi se Google prijava.
 
 ### Postojeća alternativna implementacija preko Supabase-a
 

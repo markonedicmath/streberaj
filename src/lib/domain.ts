@@ -142,12 +142,10 @@ export function ownedLesson(s: SchoolState, actor: Employee, lessonId: string) {
   demand(l && readable(actor, l));
   return l;
 }
-export function counter(s: SchoolState, studentId: string) {
-  const through = belgradeMinute();
+export function counter(s: SchoolState, studentId: string, details = lessonCounterDetails(s, true), through = belgradeMinute()) {
   const total = s.lessons
     .filter((l) => l.studentId === studentId && lessonHasEnded(l, through))
     .reduce((sum, l) => sum + lessonUnits(l), 0);
-  const details = lessonCounterDetails(s, true);
   return {
     total,
     cycle: details.current[studentId] ?? 0,
@@ -232,6 +230,8 @@ export function project(
 ): SchoolView {
   const { watchToken: _secret, ...safeSync } = s.sync;
   const ordinals = lessonCounterDetails(s).lessons;
+  const completedCounters = lessonCounterDetails(s, true);
+  const through = belgradeMinute();
   const visible = s.lessons.filter((l) => readable(actor, l));
   const visibleIds = new Set(visible.map((l) => l.id));
   const financeLessons = s.lessons.filter((lesson) =>
@@ -260,7 +260,7 @@ export function project(
       ownerIds: st.ownerIds.filter(
         (x) => x === actor.id || actor.role === "admin",
       ),
-      ...counter(s, st.id),
+      ...counter(s, st.id, completedCounters, through),
       createdAt: st.createdAt ?? studentCreatedAt(s, st.id),
     }));
   const lessons = s.lessons
@@ -1447,6 +1447,12 @@ function describeUndo(
     saveSync: "podešavanje sinhronizacije",
   };
   return labels[entry.label] ?? "poslednju izmenu";
+}
+export function snapshotForUndo(s: SchoolState): SchoolState {
+  const before = { ...s, audits: [], undoEntries: [], operations: [], boardResetBackup: undefined };
+  for (const collection of UNDO_COLLECTIONS) (before as any)[collection] = structuredClone(s[collection] ?? []);
+  before.sync = structuredClone(s.sync);
+  return before;
 }
 export function rememberUndo(
   s: SchoolState,

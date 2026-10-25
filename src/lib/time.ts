@@ -1,7 +1,6 @@
 import type { Lesson } from "./types";
 export const ZONE = "Europe/Belgrade";
-export function belgradeMinute(now = new Date()) {
-  return new Intl.DateTimeFormat("sv-SE", {
+const minuteFormatter = new Intl.DateTimeFormat("sv-SE", {
     timeZone: ZONE,
     year: "numeric",
     month: "2-digit",
@@ -9,7 +8,9 @@ export function belgradeMinute(now = new Date()) {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  })
+  });
+export function belgradeMinute(now = new Date()) {
+  return minuteFormatter
     .format(now)
     .replace(" ", "T");
 }

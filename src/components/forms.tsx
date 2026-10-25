@@ -431,6 +431,25 @@ export function LessonEditor({
   if (liveDraft) liveDraft.desk = resolveDesk(view.lessons, liveDraft);
   const liveConflicts =
     liveDraft && !closing ? previewConflicts(view.lessons, liveDraft) : [];
+  const summaryName = (selectedStudent?.name ?? studentName).trim();
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    Number.isFinite(Date.parse(date + "T12:00Z")) &&
+    new Date(date + "T12:00Z").toISOString().slice(0, 10) === date;
+  const validStart = /^(0[6-9]|1\d|2[0-2]):(00|15|30|45)$/.test(start);
+  const formIssue = !summaryName ? "Unesite ime učenika."
+    : summaryName.length > 160 ? "Ime učenika može imati najviše 160 znakova."
+    : !teacher?.active ? "Izaberite aktivnog predavača."
+    : !validDate ? "Izaberite ispravan datum."
+    : !validStart ? "Unesite početak u koracima od 15 minuta, između 06:00 i 22:45."
+    : !parsedDuration || parsedDuration.units !== 1 || !allowedDuration(duration)
+      ? "Izaberite trajanje: 45, 60, 90 ili 120 minuta."
+    : startMinute + duration > 1380 ? "Čas mora da se završi do 23:00."
+    : displayedPrice !== null && (!Number.isFinite(displayedPrice) || displayedPrice < 0 || displayedPrice > 100_000_000)
+      ? "Unesite ispravnu cenu časa."
+    : displayedPercent !== null && (!Number.isFinite(displayedPercent) || displayedPercent < 0 || displayedPercent > 100)
+      ? "Procenat mora biti između 0 i 100."
+    : "";
+  const hasIssue = !!formIssue || liveConflicts.length > 0 || !!error;
   const appliedMove = useRef(0);
   useEffect(() => {
     if (externalMove && externalMove.serial !== appliedMove.current) {
@@ -476,6 +495,10 @@ export function LessonEditor({
     durationInput,
     desk,
     mode,
+    price,
+    percent,
+    university,
+    referral,
   ]);
   useEffect(() => {
     const originalQuote = lesson
@@ -526,7 +549,7 @@ export function LessonEditor({
   ]);
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || closing) return;
+    if (busy || closing || hasIssue) return;
     setBusy(true);
     setError("");
     try {
@@ -650,11 +673,11 @@ export function LessonEditor({
                 />
               </div>
             )}
-            <p>
+            {section !== "Čas" && <p>
               {dateLabel(lesson.date)} · {clock(lesson.start)}–
               {clock(lesson.start + lesson.duration)} · {lesson.duration} min ·{" "}
               {lesson.mode === "online" ? "Online" : "Uživo"}
-            </p>
+            </p>}
             {lesson.conflict && <p className="form-error">{lesson.conflict}</p>}
             {lesson.sourceId && (
               <span className="badge">
@@ -687,26 +710,19 @@ export function LessonEditor({
             if (details) details.open = true;
           }}
         >
-          {liveDraft && (
+          {hasIssue && (
             <div
-              className={
-                "editor-live-summary " +
-                (liveConflicts.length || error ? "has-conflict" : "")
-              }
+              className="editor-live-summary has-conflict"
+              id="lesson-form-issues"
+              role="alert"
             >
               <strong>
                 {liveConflicts.length
                   ? "Preklapanje termina"
-                  : "Pregled termina"}
+                  : "Proverite podatke"}
               </strong>
-              <span>
-                {dateLabel(date)} · {clock(startMinute)}–
-                {clock(startMinute + duration)} · {duration} min ·{" "}
-                {mode === "online" ? "Online" : "Uživo"}
-                {parsedDuration && parsedDuration.units > 1
-                  ? ` · ${parsedDuration.units} odvojena časa`
-                  : ""}
-              </span>
+              {formIssue && <span>{formIssue}</span>}
+              {error && error !== formIssue && <span>{error}</span>}
               {liveConflicts.map(({ lesson: other, reason }) => (
                 <span key={other.id}>
                   {reason === "Sto je zauzet"
@@ -833,6 +849,7 @@ export function LessonEditor({
                 )}
               </span>
             </Field>
+            <div className="lesson-timing-row wide">
             <Field label="Početak">
               <LessonTimePicker
                 value={start}
@@ -842,7 +859,7 @@ export function LessonEditor({
               />
             </Field>
             <fieldset
-              className="duration-presets wide"
+              className="duration-presets"
               ref={durationRef}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -857,10 +874,9 @@ export function LessonEditor({
                   const index = TARIFFS.findIndex(
                     (tariff) => tariff.duration === duration,
                   );
-                  const direction =
-                    event.key === "ArrowRight" || event.key === "ArrowDown"
-                      ? 1
-                      : -1;
+                  const direction = event.key === "ArrowDown" ? 2
+                    : event.key === "ArrowUp" ? -2
+                    : event.key === "ArrowRight" ? 1 : -1;
                   const next = Math.max(
                     0,
                     Math.min(TARIFFS.length - 1, index + direction),
@@ -893,7 +909,17 @@ export function LessonEditor({
                 </small>
               )}
             </fieldset>
+            </div>
           </div>
+            <p className={"lesson-selected-summary" + (hasIssue ? " has-issue" : "")} aria-live="polite" aria-atomic="true">
+              <strong className="summary-student">{summaryName || "Učenik"}</strong>
+              {", "}
+              <time dateTime={validDate ? date : undefined}>{validDate ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : "—"}</time>
+              {", "}
+              <span>{validStart && parsedDuration ? `${clock(startMinute).replace(":", ".")}–${clock(startMinute + duration).replace(":", ".")}` : "—"}</span>
+              {", "}
+              <strong>{parsedDuration ? `${duration} min` : "— min"}</strong>
+            </p>
           <div
             className={
               "automatic-quote" + (ownSchoolLesson ? " own-school-quote" : "")
@@ -1152,7 +1178,6 @@ export function LessonEditor({
               </p>
             )}
           </details>
-          <ErrorMessage error={error} />
           <div className="form-actions">
             {lesson && !lesson.deletedAt && (
               <button
@@ -1182,10 +1207,11 @@ export function LessonEditor({
             <button
               ref={saveRef}
               type="submit"
-              className="btn primary"
-              disabled={busy || closing}
+              className={"btn primary lesson-book-button" + (hasIssue ? " has-issue" : "")}
+              disabled={busy || closing || hasIssue}
+              aria-describedby={hasIssue ? "lesson-form-issues" : undefined}
             >
-              {busy ? "Čuvanje…" : "Sačuvaj čas"}
+              {busy ? "Zakazivanje…" : "Zakaži čas"}
             </button>
           </div>
         </form>

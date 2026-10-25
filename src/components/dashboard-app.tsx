@@ -335,6 +335,7 @@ export default function Dashboard() {
       headers: {
         "Content-Type": "application/json",
         "Idempotency-Key": crypto.randomUUID(),
+        "X-View-Mode": "deferred",
       },
       body: JSON.stringify({ type, payload }),
     });
@@ -343,6 +344,12 @@ export default function Dashboard() {
       throw new Error(parsed.data?.error || "Izmena nije sačuvana.");
     }
     const data = parsed.data;
+    if (!data.view) {
+      const refreshed = await fetch("/api/state", { cache: "no-store" });
+      const next = await parseResponse<SchoolView & { error?: string }>(refreshed);
+      if (!next.ok || !next.data) throw new Error(next.data?.error || "Izmena je sačuvana; osvežite prikaz.");
+      data.view = next.data;
+    }
     setView((current) =>
       !current ||
       !Number.isFinite(current.revision) ||
@@ -814,7 +821,7 @@ export default function Dashboard() {
           <div className={"schedule-layout " + (source ? "with-source" : "")}>
             <section className="schedule-card">
               <div className="schedule-toolbar">
-                {/* Left group: Arrows + Dates, and Online checkbox */}
+                {/* Left group: week navigation and online view switch. */}
                 <div className="toolbar-left-group">
                   <div className="week-nav-compact">
                     <div className="compact-arrows-row">
@@ -854,23 +861,62 @@ export default function Dashboard() {
                   <label className="toolbar-checkbox-label online-toggle">
                     <input
                       type="checkbox"
+                      role="switch"
+                      aria-label="Prikaži online časove"
                       checked={online}
                       onChange={(e) => setOnline(e.target.checked)}
                     />
-                    <span>online</span>
+                    <span className="online-switch-body" aria-hidden="true">
+                      <span className="online-switch-track" />
+                      <span className="online-switch-thumb">
+                        <span className="online-switch-dome" />
+                        <span className="online-switch-scoop" />
+                      </span>
+                    </span>
+                    <span className="online-switch-caption">online</span>
                   </label>
                 </div>
 
-                {/* Center group: Circular dark plus button (horizontally centered) */}
+                {/* Center group: tactile add button. */}
                 <div className="toolbar-center-group">
                   <button
                     type="button"
                     className="toolbar-add-btn"
                     aria-label="Novi čas"
                     title="Novi čas"
-                    onClick={() => newLesson()}
+                    onClick={(event) => {
+                      if (
+                        window.matchMedia("(max-width: 768px)").matches &&
+                        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                      ) {
+                        const button = event.currentTarget;
+                        button.getAnimations().forEach((animation) => animation.cancel());
+                        button.animate(
+                          [
+                            { transform: "translateY(1px) scale(.91)" },
+                            { transform: "translateY(-2px) scale(1.07)", offset: .42 },
+                            { transform: "translateY(0) scale(.98)", offset: .72 },
+                            { transform: "translateY(0) scale(1)" },
+                          ],
+                          { duration: 160, easing: "cubic-bezier(.2,.7,.3,1)" },
+                        );
+                        const symbol = button.querySelector(".toolbar-add-symbol");
+                        symbol?.getAnimations().forEach((animation) => animation.cancel());
+                        symbol?.animate(
+                          [
+                            { transform: "rotate(-8deg) scale(.88)" },
+                            { transform: "rotate(7deg) scale(1.06)", offset: .45 },
+                            { transform: "rotate(0deg) scale(1)" },
+                          ],
+                          { duration: 173, easing: "cubic-bezier(.2,.7,.3,1)" },
+                        );
+                      }
+                      newLesson();
+                    }}
                   >
-                    <Plus size={22} color="#fff" strokeWidth={2.5} />
+                    <span className="toolbar-add-face" aria-hidden="true">
+                      <Plus className="toolbar-add-symbol" size={22} color="#fff" strokeWidth={2.5} />
+                    </span>
                   </button>
                 </div>
 

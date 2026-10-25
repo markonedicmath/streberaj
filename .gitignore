@@ -9,5 +9,6 @@ test-results/
 playwright-report/
 .open-next/
 .wrangler/
+.worker/
 .dev.vars*
 cloudflare-env.d.ts

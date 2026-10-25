@@ -73,7 +73,7 @@ async function token(state: SchoolState) {
   };
   return cached.value;
 }
-async function google(
+export async function google(
   state: SchoolState,
   url: string,
   options: RequestInit = {},

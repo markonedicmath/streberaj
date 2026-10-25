@@ -12,15 +12,7 @@ export function lessonCounterDetails(s: SchoolState, completedOnly = false) {
     const events = s.counters
       .filter((e) => e.studentId === student.id && e.type !== "completed")
       .map((e) => {
-        const parts = new Intl.DateTimeFormat("sv-SE", {
-          timeZone: "Europe/Belgrade",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).format(new Date(e.at));
+        const parts = belgradeMinute(new Date(e.at));
         return {
           key: parts.replace(" ", "T"),
           type: e.type,
@@ -47,7 +39,7 @@ export function lessonCounterDetails(s: SchoolState, completedOnly = false) {
         })),
       ...events,
     ].sort(
-      (a, b) => a.key.localeCompare(b.key) || (a.type === "lesson" ? 1 : -1),
+      (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) || (a.type === "lesson" ? 1 : -1),
     );
     let cycle = 0,
       size = student.packageSize ?? 4;

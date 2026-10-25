@@ -45,6 +45,7 @@ function hex(c: Cell | undefined) {
     c?.effectiveFormat?.backgroundColor ??
     c?.userEnteredFormat?.backgroundColor;
   if (!rgb) return null;
+  if (rgb.red === 1 && rgb.green === 1 && rgb.blue === 1) return null;
   const color =
     "#" +
     [rgb.red ?? 0, rgb.green ?? 0, rgb.blue ?? 0]
@@ -113,14 +114,17 @@ export function parseSheets(
     weekCount++;
     const cells = new Map<string, Cell>(),
       rows = new Set<number>();
+    const singleGrid = sheet.data?.length === 1 ? sheet.data[0] : undefined;
     for (const grid of sheet.data ?? [])
       for (const [r, row] of (grid.rowData ?? []).entries()) {
         const ri = r + (grid.startRow ?? 0);
         rows.add(ri);
-        for (const [c, cell] of (row.values ?? []).entries())
+        if (!singleGrid) for (const [c, cell] of (row.values ?? []).entries())
           cells.set(ri + ":" + (c + (grid.startColumn ?? 0)), cell);
       }
-    const get = (r: number, c: number) => cells.get(r + ":" + c),
+    const get = (r: number, c: number) => singleGrid
+      ? singleGrid.rowData?.[r - (singleGrid.startRow ?? 0)]?.values?.[c - (singleGrid.startColumn ?? 0)]
+      : cells.get(r + ":" + c),
       times = [...rows]
         .sort((a, b) => a - b)
         .map((r) => ({ r, t: time(get(r, 0)) }))

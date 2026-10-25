@@ -1,5 +1,5 @@
 export function studentNameKey(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("sr-Latn");
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 export function parseSourceLabel(text: string) {

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { transact, isDemo } from "@/lib/store";
 import { authenticate, sameOrigin } from "@/lib/auth";
-import { execute, project, DomainError, rememberUndo } from "@/lib/domain";
+import { execute, project, DomainError, rememberUndo, snapshotForUndo } from "@/lib/domain";
 import { boundedBody } from "@/lib/files";
 import { json, failure } from "@/lib/http";
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
           throw new DomainError("Ključ zahteva već je upotrebljen.", 409);
         return {};
       }
-      const before = structuredClone(s),
+      const before = snapshotForUndo(s),
         result = execute(s, current, command);
       rememberUndo(s, before, current, command.type);
       s.operations = [
