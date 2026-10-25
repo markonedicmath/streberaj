@@ -1197,7 +1197,7 @@ export default function Dashboard() {
                       ...l,
                       ...patch,
                       units: patch.duration !== l.duration ? 1 : (l.units ?? 1),
-                      shared: patch.mode !== l.mode ? false : l.shared,
+                      shared: (patch.mode ?? l.mode) === "online" ? true : false,
                     });
                     const saved = result.view.lessons.find(
                       (item) => item.id === l.id,

@@ -345,7 +345,7 @@ export function LessonEditor({
     ),
     [manualPrice, setManualPrice] = useState(lesson?.priceManual ?? false),
     [manualPercent, setManualPercent] = useState(lesson?.bossManual ?? false),
-    [shared, setShared] = useState(lesson?.shared ?? false);
+    [shared, setShared] = useState(true);
   const today = belgradeToday(),
     currentWeek = weekStart(today),
     nextWeek = addDays(currentWeek, 7),
@@ -578,7 +578,7 @@ export function LessonEditor({
           percent === ""
             ? null
             : Math.round(Number(percent.replace(",", ".")) * 100),
-        shared: mode === "online" ? shared : false,
+        shared: mode === "online" ? true : false,
       };
       const r = studentId
         ? await command("saveLesson", payload)
@@ -814,7 +814,8 @@ export function LessonEditor({
                         ? addDays(thisWeekDate, 7)
                         : thisWeekDate;
                     const inNextWeek = value >= nextWeek;
-                    const description = `${label}, ${dateLabel(value)}${inNextWeek ? " · sledeća nedelja" : ""}`;
+                    const isToday = value === today;
+                    const description = `${label}, ${dateLabel(value)}${inNextWeek ? " · sledeća nedelja" : isToday ? " · danas" : ""}`;
                     return (
                       <button
                         type="button"
@@ -823,6 +824,7 @@ export function LessonEditor({
                         title={description}
                         aria-pressed={date === value}
                         className={
+                          (isToday ? "is-today " : "") +
                           (inNextWeek ? "next-week " : "") +
                           (date === value ? "selected" : "")
                         }
@@ -1154,16 +1156,6 @@ export function LessonEditor({
                   </button>
                 )}
               </Field>
-              {mode === "online" && teacherId === view.actor.id && (
-                <label className="check-field wide">
-                  <input
-                    type="checkbox"
-                    checked={shared}
-                    onChange={(e) => setShared(e.target.checked)}
-                  />
-                  Podeli ovaj čas i obračun sa Manojlom
-                </label>
-              )}
             </div>
             {teacherId !== view.actor.id && !lesson && (
               <p className="muted">

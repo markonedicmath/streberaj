@@ -785,7 +785,7 @@ export function execute(
         status: "scheduled",
         price: null,
         bossBps: null,
-        shared: false,
+        shared: input.desk === null ? true : false,
       },
     });
   }
@@ -849,7 +849,7 @@ export function execute(
       input.shared !== (old.mode === "online" ? old.shared : false)
     )
       demand(false, "Samo predavač tog časa može da menja deljenje.");
-    if (!old && input.teacherId !== actor.id && input.mode === "online")
+    if (!old && input.teacherId !== actor.id && actor.role !== "admin" && input.mode === "online")
       input.shared = false;
     const quote = lessonQuote(s.rules, input, student, teacher);
     const originalQuote = old

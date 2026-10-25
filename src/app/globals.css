@@ -3825,28 +3825,47 @@ body.calendar-grabbing * {
 .date-shortcuts.weekdays button {
   padding: 6px 0;
   font-weight: 600;
-  background: #fff0dd;
-  border-color: #edc99c;
-  color: #885019;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  color: #24292f;
   transition:
     background-color 200ms ease,
     border-color 200ms ease,
     color 200ms ease;
 }
 .date-shortcuts.weekdays button:hover {
-  background: #ffe5c5;
-  border-color: #d89c54;
+  background: #f6f8fa;
+  border-color: #8c959f;
 }
 .date-shortcuts.weekdays button.selected {
-  background: #ffdbac;
-  border-color: #bf7b2e;
-  color: #713e0d;
+  background: #f0f2f5;
+  border-color: #24292f;
+  color: #111827;
 }
 .date-shortcuts.weekdays button small {
   display: block;
   margin-top: 3px;
   font-size: 9px;
   font-weight: 400;
+  color: #656d76;
+}
+.date-shortcuts.weekdays button.is-today {
+  background: #fff0dd;
+  border-color: #edc99c;
+  color: #885019;
+}
+.date-shortcuts.weekdays button.is-today:hover {
+  background: #ffe5c5;
+  border-color: #d89c54;
+}
+.date-shortcuts.weekdays button.is-today.selected {
+  background: #ffdbac;
+  border-color: #bf7b2e;
+  color: #713e0d;
+}
+.date-shortcuts.weekdays button.is-today small {
+  color: #885019;
 }
 .date-shortcuts.weekdays button.next-week {
   background: #e8f0ff;
@@ -3861,6 +3880,9 @@ body.calendar-grabbing * {
   background: #c8ddff;
   border-color: #4079c5;
   color: #17457f;
+}
+.date-shortcuts.weekdays button.next-week small {
+  color: #24559a;
 }
 .field > .date-week-hint {
   display: block;
