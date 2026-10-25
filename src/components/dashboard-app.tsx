@@ -1123,9 +1123,12 @@ export default function Dashboard() {
                   setDraftMove(null);
                   previewLesson({
                     ...l,
-                    units: l.units ?? 1,
+                    units: ("units" in l && l.units) ? l.units : 1,
                     studentName:
-                      view.students.find((s) => s.id === l.studentId)?.name ??
+                      ("studentId" in l
+                        ? view.students.find((s) => s.id === l.studentId)?.name
+                        : null) ??
+                      ("studentName" in l ? (l as any).studentName : "") ??
                       "Čas",
                   });
                   setSlot(null);
@@ -1231,11 +1234,28 @@ export default function Dashboard() {
                 }}
                 onNotice={(msg) => setNotice(msg)}
                 onPasteLesson={async (lessonData) => {
-                  return await command("saveLesson", {
-                    ...lessonData,
-                    status: "scheduled",
-                    units: 1,
-                  });
+                  if (lessonData.studentId) {
+                    return await command("saveLesson", {
+                      ...lessonData,
+                      studentId: lessonData.studentId,
+                      status: "scheduled",
+                      units: 1,
+                    });
+                  } else if (lessonData.studentName) {
+                    return await command("saveLessonDraft", {
+                      student: {
+                        name: lessonData.studentName,
+                        channel: "direct",
+                      },
+                      lesson: {
+                        ...lessonData,
+                        status: "scheduled",
+                        units: 1,
+                      },
+                    });
+                  } else {
+                    throw new Error("Nije moguće odrediti učenika za lepljenje.");
+                  }
                 }}
               />
             </section>

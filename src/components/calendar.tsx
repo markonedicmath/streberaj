@@ -76,7 +76,7 @@ interface Props {
   focusDate?: string;
   editorDraft?: LessonPreview | null;
   onEditorMove?: (patch: DraftMove) => void;
-  onOpen: (l: Lesson, focusSection?: "package") => void;
+  onOpen: (l: Lesson | BusyLesson, focusSection?: "package") => void;
   onNew: (
     date: string,
     start: number,
@@ -100,7 +100,8 @@ interface Props {
   onChangeTeacher?: (lessonId: string, teacherId: string) => Promise<void>;
   onNotice?: (message: string) => void;
   onPasteLesson?: (data: {
-    studentId: string;
+    studentId?: string;
+    studentName?: string;
     teacherId: string;
     date: string;
     start: number;
@@ -165,7 +166,7 @@ export default function Calendar({
     [deleting, setDeleting] = useState(false),
     [isScrolled, setIsScrolled] = useState(false);
   const [contextMenu, setContextMenu] = useState<
-    | { type: "lesson"; x: number; y: number; lesson: Lesson }
+    | { type: "lesson"; x: number; y: number; lesson: Lesson | BusyLesson }
     | {
         type: "empty";
         x: number;
@@ -176,7 +177,7 @@ export default function Calendar({
       }
     | null
   >(null);
-  const [copiedLesson, setCopiedLesson] = useState<Lesson | null>(() => {
+  const [copiedLesson, setCopiedLesson] = useState<Lesson | BusyLesson | null>(() => {
     if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem("streberaj-copied-lesson");
@@ -219,27 +220,27 @@ export default function Calendar({
     };
   }, [contextMenu]);
 
-  const handleCopyLesson = (l: Lesson) => {
+  const handleCopyLesson = (l: Lesson | BusyLesson) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
     setCopiedLesson(l);
     try {
       localStorage.setItem("streberaj-copied-lesson", JSON.stringify(l));
     } catch {}
-    const student = view.students.find((s) => s.id === l.studentId);
+    const student = "studentId" in l ? view.students.find((s) => s.id === l.studentId) : null;
     const studentName =
-      student?.name || ("studentName" in l ? (l as any).studentName : "") || "Čas";
+      student?.name || ("studentName" in l ? l.studentName : "") || "Čas";
     onNotice?.(`Kopiran je čas (${studentName}). Zalepite pomoću Ctrl + V ili desnim klikom.`);
   };
 
-  const handlePromeniPaket = (l: Lesson) => {
+  const handlePromeniPaket = (l: Lesson | BusyLesson) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
     onOpen(l, "package");
   };
 
   function findFirstAvailableSlot(
-    source: Lesson,
+    source: Lesson | BusyLesson,
     schoolView: SchoolView,
     targetDate: string,
   ): { date: string; start: number; desk: 1 | 2 | null } | null {
@@ -247,7 +248,7 @@ export default function Calendar({
     const mode = source.mode;
     const preferredDesk = source.desk;
     const teacherId = source.teacherId;
-    const studentId = source.studentId;
+    const studentId = "studentId" in source ? source.studentId : undefined;
 
     let candidate =
       targetDate === source.date
@@ -330,28 +331,52 @@ export default function Calendar({
     setContextMenu(null);
     setTeacherSubmenu(false);
     try {
+      let studentId = "studentId" in copiedLesson ? copiedLesson.studentId : undefined;
+      const copiedStudentName =
+        ("studentId" in copiedLesson
+          ? view.students.find((s) => s.id === copiedLesson.studentId)?.name
+          : undefined) ||
+        ("studentName" in copiedLesson ? copiedLesson.studentName : undefined);
+
+      if (!studentId && copiedStudentName) {
+        const existingStudent = view.students.find(
+          (s) => s.name.trim().toLowerCase() === copiedStudentName.trim().toLowerCase(),
+        );
+        if (existingStudent) studentId = existingStudent.id;
+      }
+
+      const canScheduleThisTeacher =
+        view.actor.role === "admin" ||
+        view.actor.id === copiedLesson.teacherId ||
+        view.actor.canScheduleOthers !== false;
+      const targetTeacherId = canScheduleThisTeacher
+        ? copiedLesson.teacherId
+        : view.actor.id;
+
       const res = await onPasteLesson({
-        studentId: copiedLesson.studentId,
-        teacherId: copiedLesson.teacherId,
+        studentId,
+        studentName: copiedStudentName,
+        teacherId: targetTeacherId,
         date,
         start,
         duration: copiedLesson.duration,
         desk,
         mode: desk === null ? "online" : copiedLesson.mode,
-        topic: copiedLesson.topic ?? "",
-        price: copiedLesson.price ?? null,
-        bossBps: copiedLesson.bossBps ?? null,
-        shared: copiedLesson.shared ?? false,
+        topic: ("topic" in copiedLesson ? copiedLesson.topic : "") ?? "",
+        price: ("price" in copiedLesson ? copiedLesson.price : null) ?? null,
+        bossBps: ("bossBps" in copiedLesson ? copiedLesson.bossBps : null) ?? null,
+        shared: ("shared" in copiedLesson ? copiedLesson.shared : false) ?? false,
       });
-      const student = view.students.find((s) => s.id === copiedLesson.studentId);
-      const studentName =
-        student?.name ||
-        ("studentName" in copiedLesson ? (copiedLesson as any).studentName : "") ||
+
+      const displayStudent =
+        copiedStudentName ||
+        (studentId ? view.students.find((s) => s.id === studentId)?.name : null) ||
         "Čas";
+
       if (res && typeof res === "object" && "entityId" in res && res.entityId) {
         setSelectedIds(new Set([res.entityId]));
       }
-      onNotice?.(`Čas (${studentName}) je uspešno nalepljen u ${clock(start)}.`);
+      onNotice?.(`Čas (${displayStudent}) je uspešno nalepljen u ${clock(start)}.`);
     } catch (err) {
       onNotice?.((err as Error).message || "Lepljenje časa nije uspelo.");
     }
@@ -375,13 +400,13 @@ export default function Calendar({
     await handlePasteAtSlot(slot.date, slot.start, slot.desk);
   };
 
-  const handleCopyText = async (l: Lesson) => {
+  const handleCopyText = async (l: Lesson | BusyLesson) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
-    const student = view.students.find((s) => s.id === l.studentId);
+    const student = "studentId" in l ? view.students.find((s) => s.id === l.studentId) : null;
     const teacherObj = view.employees.find((e) => e.id === l.teacherId);
     const studentName =
-      student?.name || ("studentName" in l ? (l as any).studentName : "") || "Čas";
+      student?.name || ("studentName" in l ? l.studentName : "") || "Čas";
     const teacherName = teacherObj?.name || "";
     const deskText =
       l.mode === "online"
@@ -412,19 +437,19 @@ export default function Calendar({
     }
   };
 
-  const handleEditLesson = (l: Lesson) => {
+  const handleEditLesson = (l: Lesson | BusyLesson) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
     onOpen(l);
   };
 
-  const handleDeleteLesson = async (l: Lesson) => {
+  const handleDeleteLesson = async (l: Lesson | BusyLesson) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
     await onDelete([l.id]);
   };
 
-  const handleChangeTeacher = async (l: Lesson, teacherId: string) => {
+  const handleChangeTeacher = async (l: Lesson | BusyLesson, teacherId: string) => {
     setContextMenu(null);
     setTeacherSubmenu(false);
     if (l.teacherId !== teacherId && onChangeTeacher) {
@@ -740,7 +765,7 @@ export default function Calendar({
         if (selectedIds.size > 0) {
           const id = [...selectedIds].at(-1);
           const l = view.lessons.find((item) => item.id === id);
-          if (l && !("restricted" in l)) {
+          if (l) {
             e.preventDefault();
             handleCopyLesson(l);
             return;
@@ -1173,8 +1198,8 @@ export default function Calendar({
     return (
       <div
         role="button"
-        data-lesson-id={restricted ? undefined : l.id}
-        aria-pressed={!restricted && selectedIds.has(l.id)}
+        data-lesson-id={l.id}
+        aria-pressed={selectedIds.has(l.id)}
         tabIndex={0}
         key={l.id}
         title={employee.name}
@@ -1215,38 +1240,34 @@ export default function Calendar({
             e.preventDefault();
             return;
           }
-          if (!restricted) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!selectedIds.has(l.id)) {
-              setSelectedIds(new Set([l.id]));
-            }
-            const menuWidth = 220;
-            const menuHeight = 280;
-            let x = e.clientX;
-            let y = e.clientY;
-            if (typeof window !== "undefined") {
-              if (x + menuWidth > window.innerWidth - 10) {
-                x = Math.max(10, window.innerWidth - menuWidth - 10);
-              }
-              if (y + menuHeight > window.innerHeight - 10) {
-                y = Math.max(10, window.innerHeight - menuHeight - 10);
-              }
-            }
-            setTeacherSubmenu(false);
-            setContextMenu({ type: "lesson", x, y, lesson: l });
+          e.preventDefault();
+          e.stopPropagation();
+          if (!selectedIds.has(l.id)) {
+            setSelectedIds(new Set([l.id]));
           }
+          const menuWidth = 220;
+          const menuHeight = 280;
+          let x = e.clientX;
+          let y = e.clientY;
+          if (typeof window !== "undefined") {
+            if (x + menuWidth > window.innerWidth - 10) {
+              x = Math.max(10, window.innerWidth - menuWidth - 10);
+            }
+            if (y + menuHeight > window.innerHeight - 10) {
+              y = Math.max(10, window.innerHeight - menuHeight - 10);
+            }
+          }
+          setTeacherSubmenu(false);
+          setContextMenu({ type: "lesson", x, y, lesson: l });
         }}
         onTouchStart={(e) => {
           if (
-            !restricted &&
             !(e.target as HTMLElement).closest("button,input,textarea")
           )
             beginTouch(e, "lesson-" + l.id);
         }}
         onTouchEnd={(e) => {
           if (
-            !restricted &&
             !(e.target as HTMLElement).closest("button,input,textarea")
           )
             endTouch(e, "lesson-" + l.id, () => onOpen(l));
@@ -1257,10 +1278,10 @@ export default function Calendar({
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
-          if (!restricted) onOpen(l);
+          onOpen(l);
         }}
         onClick={(e) => {
-          if (!restricted && Date.now() > suppress.current) {
+          if (Date.now() > suppress.current) {
             anchor.current = l.id;
             setSelectedIds((current) => {
               if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -1274,7 +1295,7 @@ export default function Calendar({
           }
         }}
         onKeyDown={(e) => {
-          if (!restricted && e.key === "Enter" && !e.altKey) {
+          if (e.key === "Enter" && !e.altKey) {
             e.preventDefault();
             onOpen(l);
           }
@@ -1851,8 +1872,9 @@ export default function Calendar({
         >
           <div className="context-menu-header">
             <div className="context-menu-title">
-              {view.students.find((s) => s.id === contextMenu.lesson.studentId)
-                ?.name ||
+              {("studentId" in contextMenu.lesson
+                ? view.students.find((s) => s.id === (contextMenu.lesson as Lesson).studentId)?.name
+                : null) ||
                 ("studentName" in contextMenu.lesson &&
                   (contextMenu.lesson as any).studentName) ||
                 "Čas"}
@@ -1879,7 +1901,7 @@ export default function Calendar({
             onClick={() => handleCopyLesson(contextMenu.lesson)}
           >
             <Copy size={14} />
-            <span>Kopiraj</span>
+            <span>Kopiraj čas</span>
           </button>
           <button
             type="button"
@@ -1996,7 +2018,9 @@ export default function Calendar({
               <ClipboardPaste size={14} />
               <span>
                 Zalepi (
-                {view.students.find((s) => s.id === copiedLesson.studentId)?.name ||
+                {("studentId" in copiedLesson
+                  ? view.students.find((s) => s.id === (copiedLesson as Lesson).studentId)?.name
+                  : null) ||
                   ("studentName" in copiedLesson
                     ? (copiedLesson as any).studentName
                     : "") ||
