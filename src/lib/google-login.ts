@@ -4,6 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { DomainError } from "./domain";
 import { readState } from "./store";
 import { oauthConfig, sealGoogle, openGoogle, GOOGLE_TIMEOUT } from "./google-oauth";
+import { clearOverrideSession } from "./override-login";
 
 const SESSION = "streberaj-session", FLOW = "streberaj-login-flow";
 const SESSION_SECONDS = 7 * 24 * 3600;
@@ -17,6 +18,7 @@ function redirect(url: string) {
   return new Response(null,{status:303,headers:{Location:url,"Cache-Control":"private, no-store","Referrer-Policy":"no-referrer"}});
 }
 export async function startGoogleLogin(request: Request) {
+  await clearOverrideSession();
   const config = oauthConfig(), state = randomBytes(32).toString("base64url"), verifier = randomBytes(48).toString("base64url");
   const redirectUri = origin(request) + "/auth/callback";
   (await cookies()).set(FLOW, await sealGoogle(JSON.stringify({kind:"login-flow", state, verifier, redirectUri, at:Date.now()})),{httpOnly:true,secure:redirectUri.startsWith("https:"),sameSite:"lax",path:"/auth",maxAge:600});
@@ -48,6 +50,7 @@ export async function finishGoogleLogin(request: Request) {
     const now = Date.now();
     jar.set(SESSION,await sealGoogle(JSON.stringify({kind:"session",actorId:actor.id,email:profile.email.toLowerCase(),sub:profile.sub,at:now,expires:now+SESSION_SECONDS*1000})),{httpOnly:true,secure:destination.protocol==="https:",sameSite:"lax",path:"/",maxAge:SESSION_SECONDS});
   } catch (error) {
+    jar.set(SESSION,"",{httpOnly:true,secure:destination.protocol==="https:",sameSite:"lax",path:"/",maxAge:0});
     destination.searchParams.set("login","error");
     destination.searchParams.set("message",error instanceof DomainError ? error.message : "Prijava nije uspela. Pokušajte ponovo.");
   }

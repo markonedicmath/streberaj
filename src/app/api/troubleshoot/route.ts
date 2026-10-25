@@ -1,4 +1,6 @@
-import { cookies } from "next/headers";
+import { sameOrigin } from "@/lib/auth";
+import { setOverrideSession, clearOverrideSession } from "@/lib/override-login";
+import { boundedBody } from "@/lib/files";
 import { readState } from "@/lib/store";
 import { DomainError } from "@/lib/domain";
 import { json, failure } from "@/lib/http";
@@ -31,7 +33,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => ({}))) as {
+    sameOrigin(request);
+    const body = JSON.parse((await boundedBody(request,4096)).toString("utf8")) as {
       code?: string;
       actorId?: string;
     };
@@ -47,24 +50,18 @@ export async function POST(request: Request) {
       throw new DomainError("Nalog zaposlenog nije pronađen.", 404);
     }
 
-    const cookieJar = await cookies();
-    cookieJar.set("streberaj-troubleshoot-actor", employee.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 86400 * 30, // 30 dana
-    });
+    await setOverrideSession(employee.id, request);
 
-    return json({ ok: true, actor: employee });
+    return json({ ok: true });
   } catch (e) {
     return failure(e);
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
-    const cookieJar = await cookies();
-    cookieJar.delete("streberaj-troubleshoot-actor");
+    sameOrigin(request);
+    await clearOverrideSession();
     return json({ ok: true });
   } catch (e) {
     return failure(e);

@@ -5,6 +5,7 @@ import { DomainError } from "./domain";
 import { isDemo, configured, readState } from "./store";
 import type { SchoolState } from "./types";
 import { directGoogleAuth, googleSession } from "./google-login";
+import { overrideSession } from "./override-login";
 export function localRequest(request: Request) {
   return ["localhost", "127.0.0.1", "[::1]"].includes(
     new URL(request.url).hostname,
@@ -32,9 +33,9 @@ export async function authClient() {
 }
 export async function authenticate(request: Request, state?: SchoolState) {
   const s = state ?? (await readState());
-  const troubleshootActor = (await cookies()).get("streberaj-troubleshoot-actor")?.value;
-  if (troubleshootActor) {
-    const actor = s.employees.find((e) => e.id === troubleshootActor && e.active);
+  const override = await overrideSession();
+  if (override) {
+    const actor = s.employees.find((e) => e.id === override.actorId && e.active);
     if (actor) return actor;
   }
   if (isDemo() && localRequest(request)) {

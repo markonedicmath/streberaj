@@ -5,6 +5,7 @@ import { authenticate, sameOrigin } from "@/lib/auth";
 import { execute, project, DomainError, rememberUndo, snapshotForUndo } from "@/lib/domain";
 import { boundedBody } from "@/lib/files";
 import { json, failure } from "@/lib/http";
+import { overrideSession } from "@/lib/override-login";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
       view: project(
         state,
         state.employees.find((e) => e.id === actor.id)!,
-        isDemo(),
+        isDemo() || !!(await overrideSession()),
       ),
       ...result,
     });

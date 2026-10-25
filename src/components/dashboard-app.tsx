@@ -84,6 +84,7 @@ export default function Dashboard() {
   const [view, setView] = useState<SchoolView | null>(null),
     [loading, setLoading] = useState(true),
     [loginError, setLoginError] = useState(""),
+    [signInError, setSignInError] = useState(""),
     [notice, setNotice] = useState(""),
     [week, setWeek] = useState(() => weekStart()),
     [day, setDay] = useState<number | null>(null),
@@ -173,7 +174,7 @@ export default function Dashboard() {
       const res = await fetch("/api/state", { cache: "no-store" });
       const parsed = await parseResponse<SchoolView & { error?: string }>(res);
       if (!parsed.ok || !parsed.data) {
-        if (parsed.status === 401) {
+        if (parsed.status === 401 || parsed.status === 403) {
           setView(null);
           setLoginError(parsed.data?.error || "Prijavite se.");
           setLoading(false);
@@ -189,6 +190,7 @@ export default function Dashboard() {
           : current,
       );
       setLoginError("");
+      setSignInError("");
     } catch {
       // network glitch
     } finally {
@@ -298,6 +300,13 @@ export default function Dashboard() {
   }, [refresh]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("login") === "error") {
+      setSignInError(params.get("message") || "Google prijava nije uspela. Pokušajte drugim nalogom.");
+      params.delete("login");
+      params.delete("message");
+      window.history.replaceState(null,"",window.location.pathname + (params.size ? "?" + params : "") + window.location.hash);
+      return;
+    }
     if (!params.has("google")) return;
     setTab("Administracija");
     setNotice(
@@ -477,8 +486,14 @@ export default function Dashboard() {
           />
         </div>
         <a className="btn primary login-btn" href="/auth/login">
-          Prijavite se Google nalogom
+          {signInError ? "Pokušaj drugim Google nalogom" : "Prijavite se Google nalogom"}
         </a>
+        {(signInError || (loginError && !/^Prijavite se[. ]/.test(loginError))) && (
+          <div className="login-error" role="alert">
+            <strong>Prijava nije uspela</strong>
+            <p>{signInError || loginError}</p>
+          </div>
+        )}
 
         {/* Bojan easter egg (only visible on mobile screens) */}
         <div className="bojan-mobile-section">

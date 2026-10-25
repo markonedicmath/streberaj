@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { readState,transact } from "./store";
 import { authenticate,sameOrigin } from "./auth";
 import { googleSession } from "../src/lib/google-login";
+import { overrideSession } from "../src/lib/override-login";
+import * as troubleshoot from "../src/app/api/troubleshoot/route";
 import { failure,json } from "../src/lib/http";
 import { DomainError,project } from "../src/lib/domain";
 import { google,secretEqual } from "../src/lib/google";
@@ -22,19 +24,21 @@ const routes: Record<string,any> = {
   "/auth/login":login,"/auth/callback":callback,"/auth/logout":logout,
   "/api/google/connect":connect,"/api/google/callback":googleCallback,"/api/google/connection":connection,
   "/api/sync/reset":reset,"/api/sync/webhook":webhook,
+  "/api/troubleshoot":troubleshoot,
 };
 const responses = new Map<string,{revision:number;minute:string;body:string}>();
 async function stateResponse(request:Request){
   const state=await readState(),actor=await authenticate(request,state);
+  const cacheKey=actor.id+":"+!!context().session?.override;
   const minute=new Date().toISOString().slice(0,16);
-  let cached=responses.get(actor.id);
+  let cached=responses.get(cacheKey);
   if(!cached || cached.revision!==state.revision || cached.minute!==minute){
     const started=performance.now();
-    cached={revision:state.revision,minute,body:JSON.stringify(project(state,actor,false))};
+    cached={revision:state.revision,minute,body:JSON.stringify(project(state,actor,!!context().session?.override))};
     profile("view",started);
-    responses.set(actor.id,cached);
+    responses.set(cacheKey,cached);
   }
-  const etag=`"${actor.id}:${state.revision}:${minute}"`;
+  const etag=`"${cacheKey}:${state.revision}:${minute}"`;
   const headers={"Cache-Control":"private, no-cache","ETag":etag,"Content-Type":"application/json; charset=utf-8"};
   return request.headers.get("if-none-match")===etag?new Response(null,{status:304,headers}):new Response(cached.body,{headers});
 }
@@ -116,9 +120,10 @@ async function handle(request:Request){
   if(path.startsWith("/api/google/") || path==="/api/sync")current.syncMetadata=true;
   if(path==="/api/health")return json({ok:true,runtime:"native-worker",storage:"d1-records"});
   if(path==="/internal/import-week")return importWeek(request);
-  if(path==="/api/troubleshoot" || path==="/api/demo")return json({error:"Provera naloga dostupna je samo lokalno."},403);
+  if(path==="/api/troubleshoot")current.authOnly=true;
+  if(path==="/api/demo")return json({error:"Koristite izbor zaposlenog.",},403);
   const internalSync=path==="/api/sync" && secretEqual(request.headers.get("authorization")?.replace(/^Bearer /,"")??null,current.env.CRON_SECRET);
-  if(path.startsWith("/api/") && !internalSync && path!=="/api/sync/webhook")current.session=await googleSession();
+  if(path.startsWith("/api/") && !internalSync && path!=="/api/sync/webhook" && path!=="/api/troubleshoot")current.session=await overrideSession() ?? await googleSession();
   if(path==="/api/state" && request.method==="GET")return stateResponse(request);
   if(path==="/api/command" && request.method==="POST")return commandResponse(request);
   if(path==="/api/sync" && request.method==="POST")return synchronize(request);
