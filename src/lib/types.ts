@@ -2,6 +2,9 @@ export type Role = "admin" | "teacher";
 export type Mode = "in_person" | "online";
 export type LessonStatus = "scheduled" | "completed" | "cancelled";
 export type Channel = "referral" | "direct" | "other";
+export const DASHBOARD_TABS = ["Raspored", "Učenici", "Obračun", "Poruke"] as const;
+export type DashboardTab = (typeof DASHBOARD_TABS)[number];
+
 export interface Employee {
   id: string;
   name: string;
@@ -12,6 +15,9 @@ export interface Employee {
   color: string;
   canSetPrice: boolean;
   canScheduleOthers?: boolean;
+  allowedTabs?: string[];
+  historyWeeksSelf?: number | null;
+  historyWeeksOthers?: number | null;
   active: boolean;
 }
 export interface Student {

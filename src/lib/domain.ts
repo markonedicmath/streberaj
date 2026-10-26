@@ -8,7 +8,7 @@ import type {
   CounterEvent,
   RateRule,
 } from "./types";
-import { belgradeToday, belgradeMinute, lessonHasEnded } from "./time";
+import { belgradeToday, belgradeMinute, lessonHasEnded, weekStart, addDays } from "./time";
 import { clock, dateLabel } from "./time";
 import {
   lessonUnits,
@@ -103,6 +103,9 @@ const employeeSchema = z.object({
     .refine(isStaffColor, "Izaberite jednu od 20 ponuđenih boja."),
   canSetPrice: z.boolean(),
   canScheduleOthers: z.boolean().default(true),
+  allowedTabs: z.array(z.string()).optional(),
+  historyWeeksSelf: z.number().int().min(0).max(520).nullable().optional(),
+  historyWeeksOthers: z.number().int().min(0).max(520).nullable().optional(),
   active: z.boolean(),
 });
 const ruleSchema = z.object({
@@ -240,11 +243,38 @@ export function project(
   const ordinals = lessonCounterDetails(s).lessons;
   const completedCounters = lessonCounterDetails(s, true);
   const through = belgradeMinute();
-  const visible = s.lessons.filter((l) => readable(actor, l));
+  const actorAllowedTabs =
+    actor.role === "admin"
+      ? ["Raspored", "Učenici", "Obračun", "Poruke", "Admin"]
+      : (actor.allowedTabs ?? ["Raspored", "Učenici", "Obračun", "Poruke"]);
+  const hasRasporedTab = actorAllowedTabs.includes("Raspored");
+  const hasUceniciTab = actorAllowedTabs.includes("Učenici");
+  const hasObracunTab = actorAllowedTabs.includes("Obračun");
+  const hasPorukeTab = actorAllowedTabs.includes("Poruke");
+  const currentMonday = weekStart(belgradeToday());
+  const cutoffSelf =
+    actor.role !== "admin" && actor.historyWeeksSelf != null
+      ? addDays(currentMonday, -7 * actor.historyWeeksSelf)
+      : null;
+  const cutoffOthers =
+    actor.role !== "admin" && actor.historyWeeksOthers != null
+      ? addDays(currentMonday, -7 * actor.historyWeeksOthers)
+      : null;
+  const visible = hasRasporedTab
+    ? s.lessons.filter((l) => {
+        if (!readable(actor, l)) return false;
+        if (cutoffSelf && l.date < cutoffSelf) return false;
+        return true;
+      })
+    : [];
   const visibleIds = new Set(visible.map((l) => l.id));
-  const financeLessons = s.lessons.filter((lesson) =>
-    financeReadable(actor, lesson),
-  );
+  const financeLessons = hasObracunTab
+    ? s.lessons.filter((lesson) => {
+        if (!financeReadable(actor, lesson)) return false;
+        if (cutoffSelf && lesson.date < cutoffSelf) return false;
+        return true;
+      })
+    : [];
   const financeIds = new Set(financeLessons.map((lesson) => lesson.id));
   const financeActions = new Set([
     "Čas označen kao plaćen",
@@ -256,47 +286,69 @@ export function project(
     "Potvrđena predaja novca",
   ]);
   const studentIds = new Set(visible.map((l) => l.studentId));
-  const students = s.students
-    .filter((st) =>
-      actor.role === "admin"
-        ? s.lessons.some((l) => l.studentId === st.id && readable(actor, l)) ||
-          st.ownerIds.includes(actor.id)
-        : st.ownerIds.includes(actor.id) || studentIds.has(st.id),
-    )
-    .map((st) => ({
-      ...st,
-      ownerIds: st.ownerIds.filter(
-        (x) => x === actor.id || actor.role === "admin",
-      ),
-      ...counter(s, st.id, completedCounters, through),
-      createdAt: st.createdAt ?? studentCreatedAt(s, st.id),
-    }));
-  const lessons = s.lessons
-    .filter(
-      (l) =>
-        (l.mode === "in_person" || readable(actor, l)) &&
-        (readable(actor, l) || (!l.deletedAt && l.status !== "cancelled")),
-    )
-    .map((l) =>
-      readable(actor, l)
-        ? {
-            ...l,
-            cycleNumbers: ordinals[l.id]?.numbers ?? [],
-            cycleSize: ordinals[l.id]?.size,
+  const students = hasUceniciTab
+    ? s.students
+        .filter((st) =>
+          actor.role === "admin"
+            ? s.lessons.some((l) => l.studentId === st.id && readable(actor, l)) ||
+              st.ownerIds.includes(actor.id)
+            : st.ownerIds.includes(actor.id) || studentIds.has(st.id),
+        )
+        .map((st) => ({
+          ...st,
+          ownerIds: st.ownerIds.filter(
+            (x) => x === actor.id || actor.role === "admin",
+          ),
+          ...counter(s, st.id, completedCounters, through),
+          createdAt: st.createdAt ?? studentCreatedAt(s, st.id),
+        }))
+    : s.students
+        .filter((st) => studentIds.has(st.id))
+        .map((st) => ({
+          ...st,
+          ownerIds: [],
+          notes: undefined,
+          referralNote: undefined,
+          otherNote: undefined,
+          ...counter(s, st.id, completedCounters, through),
+          createdAt: st.createdAt ?? studentCreatedAt(s, st.id),
+        }));
+  const lessons = hasRasporedTab
+    ? s.lessons
+        .filter((l) => {
+          const isOwn = readable(actor, l);
+          if (isOwn) {
+            if (cutoffSelf && l.date < cutoffSelf) return false;
+            return true;
+          } else {
+            if (cutoffOthers && l.date < cutoffOthers) return false;
+            return (
+              (l.mode === "in_person" || isOwn) &&
+              (isOwn || (!l.deletedAt && l.status !== "cancelled"))
+            );
           }
-        : {
-            id: l.id,
-            studentName:
-              s.students.find((st) => st.id === l.studentId)?.name ?? "Čas",
-            teacherId: l.teacherId,
-            date: l.date,
-            start: l.start,
-            duration: l.duration,
-            desk: l.desk,
-            mode: l.mode,
-            restricted: true as const,
-          },
-    );
+        })
+        .map((l) =>
+          readable(actor, l)
+            ? {
+                ...l,
+                cycleNumbers: ordinals[l.id]?.numbers ?? [],
+                cycleSize: ordinals[l.id]?.size,
+              }
+            : {
+                id: l.id,
+                studentName:
+                  s.students.find((st) => st.id === l.studentId)?.name ?? "Čas",
+                teacherId: l.teacherId,
+                date: l.date,
+                start: l.start,
+                duration: l.duration,
+                desk: l.desk,
+                mode: l.mode,
+                restricted: true as const,
+              },
+        )
+    : [];
   const undoEntry = [...(s.undoEntries ?? [])]
       .reverse()
       .find((e) => e.actorId === actor.id && !e.undone),
@@ -316,7 +368,10 @@ export function project(
   return {
     revision: s.revision,
     roundImportedDurations: s.sync.roundDurations !== false,
-    actor,
+    actor: {
+      ...actor,
+      allowedTabs: actorAllowedTabs,
+    },
     employees: s.employees.map((e) =>
       actor.role === "admin" || e.id === actor.id
         ? e
@@ -340,13 +395,17 @@ export function project(
       actor.role === "admin"
         ? s.rules
         : s.rules.filter((r) => !r.teacherId || r.teacherId === actor.id),
-    payments: s.payments.filter((p) => financeIds.has(p.lessonId)),
-    handovers: s.handovers.filter(
-      (h) =>
-        financeIds.has(h.lessonId) ||
-        (actor.role === "admin" && h.confirmed) ||
-        h.teacherId === actor.id,
-    ),
+    payments: hasObracunTab
+      ? s.payments.filter((p) => financeIds.has(p.lessonId))
+      : [],
+    handovers: hasObracunTab
+      ? s.handovers.filter(
+          (h) =>
+            financeIds.has(h.lessonId) ||
+            (actor.role === "admin" && h.confirmed) ||
+            h.teacherId === actor.id,
+        )
+      : [],
     attachments: [], // Legacy response field; file uploads have been removed.
     audits: s.audits
       .filter(
@@ -382,7 +441,7 @@ export function project(
             resourceId: undefined,
           },
     demo,
-    messages: s.messages ?? [],
+    messages: hasPorukeTab ? (s.messages ?? []) : [],
     undoLabel: safeUndoLabel(undoEntry),
     redoLabel: safeUndoLabel(redoEntry),
   };
@@ -423,6 +482,41 @@ export function execute(
   demand(actor.active);
   const c = z.object({ type: z.string(), payload: z.unknown() }).parse(raw);
   const now = new Date().toISOString();
+  if (actor.role !== "admin") {
+    const actorTabs = actor.allowedTabs ?? ["Raspored", "Učenici", "Obračun", "Poruke"];
+    if (
+      [
+        "saveLesson",
+        "saveLessonDraft",
+        "quickLesson",
+        "deleteLessons",
+        "moveLessons",
+        "setPackage",
+        "correctLessonCounter",
+      ].includes(c.type) &&
+      !actorTabs.includes("Raspored")
+    ) {
+      demand(false, "Nemate pristup rasporedu.", 403);
+    }
+    if (
+      ["saveStudent", "correctStudentCounter"].includes(c.type) &&
+      !actorTabs.includes("Učenici")
+    ) {
+      demand(false, "Nemate pristup učenicima.", 403);
+    }
+    if (
+      ["payment", "handover", "confirmHandover", "setFinanceStatus"].includes(c.type) &&
+      !actorTabs.includes("Obračun")
+    ) {
+      demand(false, "Nemate pristup obračunu.", 403);
+    }
+    if (
+      ["postMessage", "likeMessage", "pinMessage", "editMessage", "deleteMessage"].includes(c.type) &&
+      !actorTabs.includes("Poruke")
+    ) {
+      demand(false, "Nemate pristup porukama.", 403);
+    }
+  }
   if (c.type === "undo") {
     undoLast(s, actor);
     return {};
@@ -655,6 +749,10 @@ export function execute(
     const lessons = [...new Set(input.ids)].map((key) =>
       ownedLesson(s, actor, key),
     );
+    if (actor.role !== "admin" && actor.historyWeeksSelf != null) {
+      const cutoff = addDays(weekStart(belgradeToday()), -7 * actor.historyWeeksSelf);
+      demand(lessons.every((l) => l.date >= cutoff), "Ne možete brisati časove pre dozvoljene istorije.", 403);
+    }
     demand(
       lessons.every((l) => !l.deletedAt),
       "Čas je već obrisan.",
@@ -695,6 +793,14 @@ export function execute(
     );
     const next = structuredClone(s),
       originals = input.moves.map((m) => ownedLesson(s, actor, m.id));
+    if (actor.role !== "admin" && actor.historyWeeksSelf != null) {
+      const cutoff = addDays(weekStart(belgradeToday()), -7 * actor.historyWeeksSelf);
+      demand(
+        originals.every((l) => l.date >= cutoff) && input.moves.every((m) => m.date >= cutoff),
+        "Ne možete pomerati časove pre dozvoljene istorije.",
+        403,
+      );
+    }
     demand(
       originals.every((l) => !l.deletedAt),
       "Obrisani čas se ne može pomerati.",
@@ -799,6 +905,10 @@ export function execute(
   }
   if (c.type === "saveLesson") {
     const input = lessonSchema.parse(c.payload);
+    if (actor.role !== "admin" && actor.historyWeeksSelf != null) {
+      const cutoff = addDays(weekStart(belgradeToday()), -7 * actor.historyWeeksSelf);
+      demand(input.date >= cutoff, "Ne možete zakazivati časove pre dozvoljene istorije.", 403);
+    }
     const existing = input.id
       ? s.lessons.find((l) => l.id === input.id)
       : undefined;
@@ -820,6 +930,10 @@ export function execute(
       409,
     );
     if (old) demand(readable(actor, old));
+    if (old && actor.role !== "admin" && actor.historyWeeksSelf != null) {
+      const cutoff = addDays(weekStart(belgradeToday()), -7 * actor.historyWeeksSelf);
+      demand(old.date >= cutoff, "Ne možete menjati časove pre dozvoljene istorije.", 403);
+    }
     if (old && old.studentId !== input.studentId)
       demand(
         !s.payments.some((p) => p.lessonId === old.id) &&
@@ -1048,16 +1162,28 @@ export function execute(
     const input = z
       .object({
         id: z.string(),
-        key: z.enum(["canSetPrice", "canScheduleOthers"]),
-        enabled: z.boolean(),
+        key: z.enum([
+          "canSetPrice",
+          "canScheduleOthers",
+          "allowedTabs",
+          "historyWeeksSelf",
+          "historyWeeksOthers",
+        ]),
+        enabled: z.boolean().optional(),
+        value: z.any().optional(),
       })
       .parse(c.payload);
     const employee = s.employees.find((entry) => entry.id === input.id);
     demand(employee, "Predavač nije pronađen.", 404);
     const before = structuredClone(employee);
-    employee[input.key] = input.enabled;
-    if (before[input.key] !== input.enabled)
-      audit(s, actor.id, "Sačuvan zaposleni", employee.id, before, employee);
+    if (input.key === "canSetPrice" || input.key === "canScheduleOthers") {
+      employee[input.key] = input.enabled ?? input.value ?? true;
+    } else if (input.key === "allowedTabs") {
+      employee.allowedTabs = Array.isArray(input.value) ? input.value : undefined;
+    } else if (input.key === "historyWeeksSelf" || input.key === "historyWeeksOthers") {
+      employee[input.key] = typeof input.value === "number" ? input.value : null;
+    }
+    audit(s, actor.id, "Sačuvan zaposleni", employee.id, before, employee);
     return { entityId: employee.id };
   }
   if (c.type === "saveEmployee") {

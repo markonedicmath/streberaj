@@ -153,6 +153,47 @@ export default function Dashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [troubleshootOpen, setTroubleshootOpen] = useState(false);
   const [troubleshootPass, setTroubleshootPass] = useState("");
+
+  const allowedTabs = useMemo(() => {
+    if (!view) return new Set(["Raspored", "Učenici", "Obračun", "Poruke"]);
+    const list =
+      view.actor.role === "admin"
+        ? (view.actor.allowedTabs ?? ["Raspored", "Učenici", "Obračun", "Poruke"]).concat("Admin")
+        : (view.actor.allowedTabs ?? ["Raspored", "Učenici", "Obračun", "Poruke"]);
+    return new Set(list);
+  }, [view]);
+
+  const navTabs = useMemo(() => {
+    if (!view) return [];
+    return [
+      { label: "Raspored", icon: CalendarDays },
+      { label: "Učenici", icon: Users },
+      { label: "Obračun", icon: Wallet },
+      { label: "Poruke", icon: MessageCircle },
+      ...(view.actor.role === "admin"
+        ? [{ label: "Admin", icon: SlidersHorizontal }]
+        : []),
+    ].filter((item) => allowedTabs.has(item.label));
+  }, [allowedTabs, view]);
+
+  useEffect(() => {
+    if (view && !allowedTabs.has(tab) && navTabs.length > 0) {
+      setTab(navTabs[0].label);
+    }
+  }, [tab, allowedTabs, navTabs, view]);
+
+  const earliestNavDate = useMemo(() => {
+    if (!view || view.actor.role === "admin") return null;
+    const selfLimit = view.actor.historyWeeksSelf;
+    const othersLimit = view.actor.historyWeeksOthers;
+    if (selfLimit == null || othersLimit == null) {
+      return null;
+    }
+    const maxWeeks = Math.max(selfLimit, othersLimit);
+    return addDays(weekStart(belgradeToday()), -7 * maxWeeks);
+  }, [view]);
+
+  const isPrevDisabled = earliestNavDate !== null && week <= earliestNavDate;
   const [troubleshootWorkers, setTroubleshootWorkers] = useState<
     Array<{ id: string; name: string; role: string; color: string }>
   >([]);
@@ -929,15 +970,7 @@ export default function Dashboard() {
         </div>
         <div className="header-nav-container">
           <nav>
-            {[
-              { label: "Raspored", icon: CalendarDays },
-              { label: "Učenici", icon: Users },
-              { label: "Obračun", icon: Wallet },
-              { label: "Poruke", icon: MessageCircle },
-              ...(view.actor.role === "admin"
-                ? [{ label: "Admin", icon: SlidersHorizontal }]
-                : []),
-            ].map(({ label, icon: Icon }) => (
+            {navTabs.map(({ label, icon: Icon }) => (
               <button
                 className={tab === label ? "active" : ""}
                 key={label}
@@ -959,7 +992,11 @@ export default function Dashboard() {
         </div>
       </aside>
       <main className="main">
-        {tab === "Raspored" ? (
+        {navTabs.length === 0 ? (
+          <section className="content-card empty-state-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+            <p>Nemate dozvolu za pristup nijednoj kartici. Obratite se administratoru.</p>
+          </section>
+        ) : (tab === "Raspored" && allowedTabs.has("Raspored")) ? (
           <div className={"schedule-layout " + (source ? "with-source" : "")}>
             <section className="schedule-card">
               <div className="schedule-toolbar">
@@ -980,14 +1017,18 @@ export default function Dashboard() {
                       className="toolbar-native-calendar-input"
                       aria-label="Izaberi datum iz kalendara"
                       value={focusDate}
+                      min={earliestNavDate ?? undefined}
                       onClick={(e) => {
                         try {
                           (e.currentTarget as HTMLInputElement).showPicker?.();
                         } catch {}
                       }}
                       onChange={(event) => {
-                        const date = event.target.value;
+                        let date = event.target.value;
                         if (!date) return;
+                        if (earliestNavDate && date < earliestNavDate) {
+                          date = earliestNavDate;
+                        }
                         const monday = weekStart(date);
                         setWeek(monday);
                         setFocusDate(date);
@@ -1019,9 +1060,13 @@ export default function Dashboard() {
                     {weekPickerOpen && <div className="week-picker-popover">
                     <label htmlFor="schedule-week-date">Izaberi datum</label>
                     <input id="schedule-week-date" ref={weekDateInput} type="date" className="week-date-input" aria-label="Datum rasporeda" value={focusDate}
+                      min={earliestNavDate ?? undefined}
                       onChange={event => {
-                        const date = event.target.value;
+                        let date = event.target.value;
                         if (!date) return;
+                        if (earliestNavDate && date < earliestNavDate) {
+                          date = earliestNavDate;
+                        }
                         const monday = weekStart(date);
                         setWeek(monday); setFocusDate(date);
                         if (day !== null) setDay(Math.round((Date.parse(date + "T12:00Z") - Date.parse(monday + "T12:00Z")) / 86400000));
@@ -1038,8 +1083,11 @@ export default function Dashboard() {
                         type="button"
                         className="icon-btn compact-nav-arrow"
                         aria-label="Prethodna nedelja"
+                        disabled={isPrevDisabled}
                         onClick={() => {
+                          if (isPrevDisabled) return;
                           const prev = addDays(week, -7);
+                          if (earliestNavDate && prev < earliestNavDate) return;
                           setWeek(prev);
                           setFocusDate(prev);
                         }}
@@ -1269,6 +1317,10 @@ export default function Dashboard() {
               />
             )}
           </div>
+        ) : !allowedTabs.has(tab) ? (
+          <section className="content-card empty-state-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+            <p>Nemate dozvolu za pristup ovoj kartici.</p>
+          </section>
         ) : (
           <>
             <div className="section-heading">
@@ -1386,6 +1438,8 @@ export default function Dashboard() {
                         <tr>
                           <th>Predavač</th>
                           <th>Google nalog</th>
+                          <th>Dozvoljene kartice</th>
+                          <th>Istorija časova</th>
                           <th>Menja cenu</th>
                           <th>Zakazuje za druge</th>
                           <th />
@@ -1402,6 +1456,25 @@ export default function Dashboard() {
                               </span>
                             </td>
                             <td>{e.email || "Prijava nije podešena"}</td>
+                            <td>
+                              <div className="tab-pill-badges">
+                                {(e.allowedTabs ?? ["Raspored", "Učenici", "Obračun", "Poruke"]).map((t) => (
+                                  <span key={t} className="tab-pill-badge">{t}</span>
+                                ))}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="history-summary-text">
+                                <div>
+                                  <span className="history-label-muted">Svoji: </span>
+                                  <strong>{e.historyWeeksSelf != null ? `${e.historyWeeksSelf} ned.` : "Neograničeno"}</strong>
+                                </div>
+                                <div>
+                                  <span className="history-label-muted">Tuđi: </span>
+                                  <strong>{e.historyWeeksOthers != null ? `${e.historyWeeksOthers} ned.` : "Neograničeno"}</strong>
+                                </div>
+                              </div>
+                            </td>
                             {(
                               ["canSetPrice", "canScheduleOthers"] as const
                             ).map((key) => (

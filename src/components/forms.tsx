@@ -1678,6 +1678,88 @@ export function StudentEditor({
     </Modal>
   );
 }
+function HistoryLimitField({
+  label,
+  value,
+  onChange,
+  help,
+}: {
+  label: string;
+  value: number | null | undefined;
+  onChange: (val: number | null) => void;
+  help?: string;
+}) {
+  const PRESETS = [0, 1, 2, 3, 4, 8, 12, 26, 52];
+  const isPreset =
+    value === null || value === undefined || PRESETS.includes(value);
+  const [isCustom, setIsCustom] = useState(
+    !isPreset && typeof value === "number",
+  );
+
+  const selectValue =
+    value === null || value === undefined
+      ? "unlimited"
+      : isCustom
+        ? "custom"
+        : String(value);
+
+  return (
+    <div className="history-limit-field">
+      <label className="history-limit-label">
+        <strong>{label}</strong>
+      </label>
+      <div className="history-limit-controls">
+        <select
+          value={isCustom ? "custom" : selectValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "unlimited") {
+              setIsCustom(false);
+              onChange(null);
+            } else if (v === "custom") {
+              setIsCustom(true);
+              onChange(typeof value === "number" ? value : 1);
+            } else {
+              setIsCustom(false);
+              onChange(Number(v));
+            }
+          }}
+        >
+          <option value="unlimited">Neograničeno (vidi celu istoriju)</option>
+          <option value="0">
+            Bez istorije (0 nedelja — samo tekuća i ubuduće)
+          </option>
+          <option value="1">1 nedelja unazad</option>
+          <option value="2">2 nedelje unazad</option>
+          <option value="3">3 nedelje unazad</option>
+          <option value="4">4 nedelje unazad (~1 mesec)</option>
+          <option value="8">8 nedelja unazad (~2 meseca)</option>
+          <option value="12">12 nedelja unazad (~3 meseca)</option>
+          <option value="26">26 nedelja unazad (~6 meseci)</option>
+          <option value="52">52 nedelje unazad (~1 godina)</option>
+          <option value="custom">Prilagođeno (unesi broj nedelja)</option>
+        </select>
+        {isCustom && (
+          <div className="history-limit-custom-input">
+            <input
+              type="number"
+              min={0}
+              max={520}
+              value={typeof value === "number" ? value : 0}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                onChange(isNaN(n) ? 0 : Math.max(0, Math.min(520, n)));
+              }}
+            />
+            <span>nedelja</span>
+          </div>
+        )}
+      </div>
+      {help && <small className="help-text">{help}</small>}
+    </div>
+  );
+}
+
 export function EmployeeEditor({
   employee,
   employees,
@@ -1701,6 +1783,9 @@ export function EmployeeEditor({
           )?.background ?? "",
         canSetPrice: true,
         canScheduleOthers: true,
+        allowedTabs: ["Raspored", "Učenici", "Obračun", "Poruke"],
+        historyWeeksSelf: null,
+        historyWeeksOthers: null,
         active: true,
       },
     ),
@@ -1819,6 +1904,60 @@ export function EmployeeEditor({
               ))}
             </fieldset>
           ))}
+          <fieldset className="wide employee-tabs-picker">
+            <legend>Dozvoljene kartice (tabovi)</legend>
+            <div className="tab-checkboxes-row">
+              {(
+                [
+                  ["Raspored", "Raspored"],
+                  ["Učenici", "Učenici"],
+                  ["Obračun", "Obračun"],
+                  ["Poruke", "Poruke"],
+                ] as const
+              ).map(([tabKey, tabLabel]) => {
+                const currentTabs =
+                  value.allowedTabs ?? [
+                    "Raspored",
+                    "Učenici",
+                    "Obračun",
+                    "Poruke",
+                  ];
+                const checked = currentTabs.includes(tabKey);
+                return (
+                  <label key={tabKey} className="tab-check-label">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...currentTabs, tabKey]
+                          : currentTabs.filter((t) => t !== tabKey);
+                        update("allowedTabs", next);
+                      }}
+                    />
+                    <span>{tabLabel}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <small className="help-text">
+              Isključite kartice kojima zaposleni ne sme da pristupa.
+            </small>
+          </fieldset>
+          <div className="wide history-limits-group">
+            <HistoryLimitField
+              label="Istorija za svoje časove"
+              value={value.historyWeeksSelf}
+              onChange={(val) => update("historyWeeksSelf", val)}
+              help="Koliko nedelja u prošlost predavač može da vidi svoje časove."
+            />
+            <HistoryLimitField
+              label="Istorija za tuđe časove"
+              value={value.historyWeeksOthers}
+              onChange={(val) => update("historyWeeksOthers", val)}
+              help="Koliko nedelja u prošlost predavač može da vidi časove drugih predavača."
+            />
+          </div>
           <label className="check-field wide">
             <input
               type="checkbox"
